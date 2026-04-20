@@ -243,63 +243,78 @@ async function closeWindow() {
 
 <template>
   <main class="app-shell" @click="closeContextMenu">
-   <aside class="sidebar" aria-label="Project actions">
-  <div class="primary-actions">
-    <button
-      class="sidebar-action"
-      type="button"
-      @click.stop="openCreateDialog"
-    >
-      <img :src="iconNewFile" class="sidebar-icon" alt="" aria-hidden="true" />
-      <span>New Project</span>
-    </button>
+    <header class="titlebar" data-tauri-drag-region>
+      <h1>BVE5 Motor Assistance</h1>
+      <div class="window-controls">
+        <button
+          type="button"
+          aria-label="Minimize"
+          @click.stop="minimizeWindow"
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M2 6h8" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          aria-label="Maximize"
+          @click.stop="toggleMaximizeWindow"
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M3 3h6v6H3z" />
+          </svg>
+        </button>
+        <button type="button" aria-label="Close" @click.stop="closeWindow">
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="m3 3 6 6M9 3 3 9" />
+          </svg>
+        </button>
+      </div>
+    </header>
 
-    <button class="sidebar-action" type="button" @click.stop="browseFile">
-      <img :src="iconOpenFile" class="sidebar-icon" alt="" aria-hidden="true" />
-      <span>Open File</span>
-    </button>
-  </div>
+    <aside class="sidebar" aria-label="Project actions">
+      <div class="primary-actions">
+        <button
+          class="sidebar-action"
+          type="button"
+          @click.stop="openCreateDialog"
+        >
+          <img
+            :src="iconNewFile"
+            class="sidebar-icon"
+            alt=""
+            aria-hidden="true"
+          />
+          <span>New Project</span>
+        </button>
 
-  <button
-    class="sidebar-action settings-action"
-    type="button"
-    @click.stop="showToast('Settings reserved')"
-  >
-    <img :src="iconSettings" class="sidebar-icon" alt="" aria-hidden="true" />
-    <span>Settings</span>
-  </button>
-</aside>
+        <button class="sidebar-action" type="button" @click.stop="browseFile">
+          <img
+            :src="iconOpenFile"
+            class="sidebar-icon"
+            alt=""
+            aria-hidden="true"
+          />
+          <span>Open File</span>
+        </button>
+      </div>
+
+      <button
+        class="sidebar-action settings-action"
+        type="button"
+        @click.stop="showToast('Settings reserved')"
+      >
+        <img
+          :src="iconSettings"
+          class="sidebar-icon"
+          alt=""
+          aria-hidden="true"
+        />
+        <span>Settings</span>
+      </button>
+    </aside>
 
     <section class="workspace">
-      <header class="titlebar" data-tauri-drag-region>
-        <h1>BVE5 Motor Assistance</h1>
-        <div class="window-controls">
-          <button
-            type="button"
-            aria-label="Minimize"
-            @click.stop="minimizeWindow"
-          >
-            <svg viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M2 6h8" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label="Maximize"
-            @click.stop="toggleMaximizeWindow"
-          >
-            <svg viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M3 3h6v6H3z" />
-            </svg>
-          </button>
-          <button type="button" aria-label="Close" @click.stop="closeWindow">
-            <svg viewBox="0 0 12 12" aria-hidden="true">
-              <path d="m3 3 6 6M9 3 3 9" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
       <div class="content">
         <div class="toolbar">
           <label class="search-field" aria-label="Search projects">
@@ -365,12 +380,10 @@ async function closeWindow() {
           </div>
         </section>
       </div>
-
-
     </section>
 
     <footer class="bottom-bar">
-            <span class="version">v{{ APP_VERSION }}</span>
+      <span class="version">v{{ APP_VERSION }}</span>
     </footer>
     <div
       v-if="contextMenu.visible"
@@ -520,33 +533,37 @@ svg {
 .app-shell {
   position: relative;
   display: grid;
+  grid-template-rows: 69px 1fr 55px;
   grid-template-columns: 128px 1fr;
-  grid-template-rows: 1fr 55px;
   width: 100%;
-  height: 100%;
+  height: 100vh; 
   overflow: hidden;
   min-width: 880px;
   min-height: 620px;
   overflow: hidden;
   color: #f4f8fb;
-  background:#292E34
+  background: #292e34;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: grid-template-columns;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  grid-row: 1 ;
-  width: 128px;
-  padding: 69px 0 0;
-  background: #22272B;
+  grid-row: 2;
+  grid-column: 1;
+width: 100%;
+  padding: 20px 0 0;
+  background: #22272b;
   border-right: 1px solid rgba(160, 189, 203, 0.06);
   box-shadow: 12px 0 42px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
 }
 
 .bottom-bar {
   grid-column: 1 / 3; /* 或者使用 1 / -1，表示从第一列跨越到最后一列 */
-  grid-row: 2;
+  grid-row: 3;
   background-color: #293038;
   height: 55px;
   display: flex;
@@ -561,24 +578,27 @@ svg {
 }
 
 .sidebar-icon {
-  width: 32px;  /* 从 36px 改为 48px */
+  width: 32px; /* 从 36px 改为 48px */
   height: 32px; /* 从 36px 改为 48px */
   object-fit: contain;
   margin-bottom: 4px; /* 增加一点下边距，让图标和文字不那么拥挤 */
+  flex-shrink: 0;           /* 防止图标被挤压 */
+  transition: transform 0.3s ease;
 }
 
 .sidebar-action {
-  position: relative; /* 必须设置，用于伪元素定位 */
-  display: grid;
-  place-items: center;
-  gap: 4px;
+  position: relative;
+  display: flex;             /* 改为 flex */
+  flex-direction: column;    /* 纵向排布 */
+  align-items: center;       /* 水平居中 */
+  justify-content: center;   /* 垂直居中：解决图标不居中的关键 */
+  gap: 4px;                  /* 初始间距 */
   width: 100%;
-  padding: 12px 10px;
-  color: #ffffff;
+  height: 80px;              /* 给一个固定高度，方便垂直居中 */
+  padding: 0;                /* 移除 padding，全靠 flex 居中 */
   background: transparent;
   border: 0;
-  border-radius: 0;
-  transition: background 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 /* 蓝色条：初始状态透明或隐藏 */
@@ -589,7 +609,7 @@ svg {
   top: 0;
   bottom: 0;
   width: 5px;
-  background-color: #4D85C2;
+  background-color: #4d85c2;
   opacity: 0; /* 默认不可见 */
   transition: opacity 0.2s ease;
 }
@@ -602,20 +622,27 @@ svg {
 
 .sidebar-action:hover,
 .sidebar-action:focus-visible {
-  background: #292E34;
+  background: #292e34;
   outline: none;
 }
 
 .sidebar-action span {
-  font-size: 16px;
-  letter-spacing: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 1;
+  max-height: 20px;         /* 使用 max-height 而不是 width */
+  transition: 
+    opacity 0.2s ease, 
+    max-height 0.2s ease,
+    margin 0.2s ease;
 }
 
 .workspace {
   position: relative;
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   padding: 0 23px 28px 24px;
 }
@@ -623,18 +650,21 @@ svg {
 .titlebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 69px;
-  margin: 0 -23px 0 -24px;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 100;
+  margin: 0;
   padding: 0 20px 0 24px;
-  background: #22272B;
+  height: 69px;
+  background: #22272b;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  justify-content: space-between;
   user-select: none;
 }
 
 .titlebar h1 {
   margin: 0;
-  font-size: clamp(24px, 2vw, 32px);
+  font-size: 31px;
   font-weight: 780;
   letter-spacing: 0;
 }
@@ -676,9 +706,10 @@ svg {
 }
 
 .content {
-  height: calc(100% - 69px);
+  height: 100%; /* 继承 workspace 的高度 */
+  display: flex;
+  flex-direction: column;
   padding-top: 22px;
-  overflow: hidden;
 }
 
 .toolbar {
@@ -759,6 +790,7 @@ svg {
 }
 
 .project-gallery {
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(284px, 1fr));
   gap: 12px 15px;
@@ -1064,21 +1096,45 @@ svg {
 
 @media (max-width: 980px) {
   .app-shell {
-    grid-template-columns: 104px 1fr;
-    min-width: 760px;
+    grid-template-columns: 64px 1fr; /* 侧边栏缩窄 */
   }
 
-  .sidebar {
-    width: 104px;
+  .sidebar-action {
+    gap: 0;                 /* 彻底移除间距，让图标居中 */
   }
 
-  .sidebar-action span,
-  .sort-control {
-    font-size: 14px;
+  .sidebar-action span {
+    opacity: 0;
+    max-height: 0;          /* 高度归零，不占空间 */
+    margin-top: 0;
+    overflow: hidden;
   }
 
-  .project-gallery {
-    grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  .sidebar-icon {
+    transform: scale(0.9);  /* 侧边栏变小时，图标可以稍微放大一点视觉更平衡 */
   }
+}
+
+
+
+/* 针对 Webkit 内核 (Tauri/Edge/Chrome) 修改清除按钮样式 */
+.search-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none; /* 禁用系统默认样式 */
+  height: 16px;
+  width: 16px;
+  cursor: pointer;
+  
+  /* 使用 mask 遮罩来实现改色：这样你可以随意更改 background-color */
+  background-color: #9597a1; /* 这里设置你想要的蓝色 */
+  
+  /* 下面是叉叉的图标数据 */
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6L6 18M6 6l12 12'%3E%3C/path%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+/* 鼠标悬停时变白或变亮 */
+.search-field input::-webkit-search-cancel-button:hover {
+  background-color: #cb7f7f;
 }
 </style>
