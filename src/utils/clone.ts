@@ -1,3 +1,5 @@
+import { toRaw } from "vue";
+
 export function deepClone<T>(value: T): T {
-  return structuredClone(value);
+  return structuredClone(toRaw(value));
 }

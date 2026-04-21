@@ -19,6 +19,9 @@ export const useEditorStore = defineStore("editor", () => {
   const playback = computed(() => runtime.value.playback);
   const selection = computed(() => runtime.value.selection);
   const view = computed(() => runtime.value.view);
+  const activeCurveSet = computed(() =>
+    runtime.value.simulator.mode === "brake" ? "brake" : "traction",
+  );
 
   function initializeFromProject(
     maxSpeed = 120,
@@ -107,6 +110,8 @@ export const useEditorStore = defineStore("editor", () => {
 
   function setActiveTrackId(trackId: ID | null) {
     runtime.value.selection.activeTrackId = trackId;
+    runtime.value.selection.selectedKeyframe = null;
+    runtime.value.selection.hoveredKeyframe = null;
   }
 
   function selectKeyframe(selected: SelectedKeyframeRef | null) {
@@ -147,6 +152,7 @@ export const useEditorStore = defineStore("editor", () => {
     playback,
     selection,
     view,
+    activeCurveSet,
 
     initializeFromProject,
     resetEditor,

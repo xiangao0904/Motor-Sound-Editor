@@ -1,26 +1,48 @@
 import { APP_VERSION, PROJECT_SCHEMA_VERSION } from "./project";
 import type { CreateProjectPayload, ProjectDocument } from "./project";
-import type { Track, TrackCurve } from "./track";
+import type {
+  CurveKind,
+  Keyframe,
+  Track,
+  TrackCurve,
+  TrackCurveSet,
+} from "./track";
 import type { EditorRuntimeState } from "./editor";
 
-function createDefaultCurve(kind: "pitch" | "volume"): TrackCurve {
+function createKeyframes(kind: CurveKind, maxSpeed: number): Keyframe[] {
+  if (kind === "pitch") {
+    return [
+      { id: crypto.randomUUID(), speed: 0, value: 1 },
+      { id: crypto.randomUUID(), speed: maxSpeed * 0.2, value: 1.5 },
+      { id: crypto.randomUUID(), speed: maxSpeed * 0.5, value: 1 },
+      { id: crypto.randomUUID(), speed: maxSpeed, value: 0.55 },
+    ];
+  }
+
+  return [
+    { id: crypto.randomUUID(), speed: 0, value: 0 },
+    { id: crypto.randomUUID(), speed: maxSpeed * 0.08, value: 0.9 },
+    { id: crypto.randomUUID(), speed: maxSpeed * 0.5, value: 1 },
+    { id: crypto.randomUUID(), speed: maxSpeed, value: 1 },
+  ];
+}
+
+function createDefaultCurve(kind: CurveKind, maxSpeed: number): TrackCurve {
   return {
     kind,
     interpolation: "linear",
-    keyframes:
-      kind === "pitch"
-        ? [
-            { id: crypto.randomUUID(), speed: 0, value: 1.0 },
-            { id: crypto.randomUUID(), speed: 120, value: 1.0 },
-          ]
-        : [
-            { id: crypto.randomUUID(), speed: 0, value: 1.0 },
-            { id: crypto.randomUUID(), speed: 120, value: 1.0 },
-          ],
+    keyframes: createKeyframes(kind, maxSpeed),
   };
 }
 
-export function createDefaultTrack(name = "Track 1"): Track {
+function createDefaultCurveSet(maxSpeed: number): TrackCurveSet {
+  return {
+    pitch: createDefaultCurve("pitch", maxSpeed),
+    volume: createDefaultCurve("volume", maxSpeed),
+  };
+}
+
+export function createDefaultTrack(name = "Track 1", maxSpeed = 120): Track {
   return {
     id: crypto.randomUUID(),
     name,
@@ -28,11 +50,12 @@ export function createDefaultTrack(name = "Track 1"): Track {
     assetId: null,
     enabled: true,
     mute: false,
-    solo: false,
     visible: true,
     locked: false,
-    pitchCurve: createDefaultCurve("pitch"),
-    volumeCurve: createDefaultCurve("volume"),
+    curveSets: {
+      traction: createDefaultCurveSet(maxSpeed),
+      brake: createDefaultCurveSet(maxSpeed),
+    },
   };
 }
 
