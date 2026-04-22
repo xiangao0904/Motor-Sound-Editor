@@ -5,6 +5,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  reactive,
   ref,
   watch,
 } from "vue";
@@ -26,6 +27,7 @@ import type {
   Keyframe,
   Track,
   TrackCurve,
+  TrackCurveSet,
 } from "@/types/track";
 
 import iconMute from "@/assets/icons/mute.png";
@@ -52,7 +54,28 @@ interface ChartRuntime {
   curveLayer: Konva.Layer;
   interactionLayer: Konva.Layer;
   playhead: Konva.Line | null;
+  hoverHint: Konva.Text | null;
   config: ChartConfig;
+}
+
+type CurveSetDraft = Record<CurveSetKind, TrackCurveSet>;
+
+interface ChartContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  chartKind: CurveKind | null;
+  speed: number;
+  value: number;
+}
+
+interface ListContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  curveSet: CurveSetKind | null;
+  kind: CurveKind | null;
+  index: number | null;
 }
 
 const projectStore = useProjectStore();
@@ -65,6 +88,34 @@ const pitchChartEl = ref<HTMLDivElement | null>(null);
 const volumeChartEl = ref<HTMLDivElement | null>(null);
 const speedDraft = ref("0.0");
 const toast = ref("");
+const chartContextMenu = reactive<ChartContextMenuState>({
+  visible: false,
+  x: 0,
+  y: 0,
+  chartKind: null,
+  speed: 0,
+  value: 0,
+});
+const isListEditorOpen = ref(false);
+const listDraft = ref<CurveSetDraft | null>(null);
+const listEditorTrackId = ref<string | null>(null);
+const listContextMenu = reactive<ListContextMenuState>({
+  visible: false,
+  x: 0,
+  y: 0,
+  curveSet: null,
+  kind: null,
+  index: null,
+});
+const addKeyframePanel = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  curveSet: "traction" as CurveSetKind,
+  kind: "volume" as CurveKind,
+  speed: "0",
+  value: "0",
+});
 
 const charts = new Map<CurveKind, ChartRuntime>();
 const resizeObservers: ResizeObserver[] = [];
@@ -121,6 +172,39 @@ const modeLabel = computed(() => {
   if (mode === "brake") return "Brake";
   return "Coasting";
 });
+
+const listEditorTrack = computed(() => {
+  const trackId = listEditorTrackId.value;
+  return trackId ? projectStore.trackById.get(trackId) ?? null : null;
+});
+
+const listRows = computed(() => {
+  const draft = listDraft.value;
+  if (!draft) return [];
+
+  const rowCount = Math.max(
+    draft.traction.volume.keyframes.length,
+    draft.traction.pitch.keyframes.length,
+    draft.brake.volume.keyframes.length,
+    draft.brake.pitch.keyframes.length,
+    1,
+  );
+
+  return Array.from({ length: rowCount }, (_, index) => index);
+});
+
+const canDeleteListContextKeyframe = computed(() => {
+  const { curveSet, kind, index } = listContextMenu;
+  if (!curveSet || !kind || index === null) return false;
+
+  return getDraftKeyframe(curveSet, kind, index) !== null;
+});
+
+const listSyncLabel = computed(() =>
+  listContextMenu.curveSet === "brake"
+    ? "Sync brake to traction"
+    : "Sync traction to brake",
+);
 
 function showToast(message: string) {
   toast.value = message;
@@ -217,7 +301,10 @@ function isEditableTrack(track: Track) {
 }
 
 function setStageCursor(runtime: ChartRuntime) {
-  runtime.stage.container().style.cursor = "default";
+  runtime.stage.container().style.cursor =
+    editorStore.view.tool === "keyframe" && activeTrack.value
+      ? "crosshair"
+      : "default";
 }
 
 function resizeStage(runtime: ChartRuntime, container: HTMLDivElement) {
@@ -246,6 +333,7 @@ function createStage(container: HTMLDivElement, config: ChartConfig) {
     curveLayer,
     interactionLayer,
     playhead: null,
+    hoverHint: null,
     config,
   };
   charts.set(config.kind, runtime);
@@ -257,7 +345,7 @@ function createStage(container: HTMLDivElement, config: ChartConfig) {
   });
   stage.on("contextmenu", (event) => {
     event.evt.preventDefault();
-    handleChartContextMenu(runtime, event.target);
+    handleChartContextMenu(runtime, event);
   });
 
   const observer = new ResizeObserver(() => resizeStage(runtime, container));
@@ -279,7 +367,10 @@ function stopCurrentKeyframeDrag() {
   isPreparingKeyframeDrag = false;
   isDraggingKeyframe = false;
   suppressNextChartClick = false;
-  charts.forEach((runtime) => setStageCursor(runtime));
+  charts.forEach((runtime) => {
+    hideKeyframeHoverHint(runtime);
+    setStageCursor(runtime);
+  });
 }
 
 function isSameSelectedKeyframe(
@@ -333,7 +424,265 @@ function stepMode(direction: "up" | "down") {
   }
 }
 
+function closeChartContextMenu() {
+  chartContextMenu.visible = false;
+}
+
+function closeListContextMenu() {
+  listContextMenu.visible = false;
+}
+
+function closeAddKeyframePanel() {
+  addKeyframePanel.visible = false;
+}
+
+function closeTransientMenus() {
+  closeChartContextMenu();
+  closeListContextMenu();
+  closeAddKeyframePanel();
+}
+
+function addKeyframeAtChartPoint(
+  runtime: ChartRuntime,
+  speed: number,
+  value: number,
+) {
+  const active = activeTrack.value;
+  if (!active || active.visible === false) return null;
+
+  const curve = active.curveSets[activeCurveSet.value][runtime.config.kind];
+  const keyframe = projectStore.addKeyframe(
+    active.id,
+    activeCurveSet.value,
+    runtime.config.kind,
+    speed,
+    Number.isFinite(value) ? value : sampleCurve(curve, speed),
+  );
+
+  if (keyframe) {
+    editorStore.selectKeyframe({
+      trackId: active.id,
+      curveSet: activeCurveSet.value,
+      kind: runtime.config.kind,
+      keyframeId: keyframe.id,
+    });
+    pushHistory("Add keyframe");
+    syncAudioPreview();
+    renderCurveCharts();
+  }
+
+  return keyframe;
+}
+
+function cloneDraftCurve(curve: TrackCurve): TrackCurve {
+  return {
+    kind: curve.kind,
+    interpolation: curve.interpolation,
+    keyframes: curve.keyframes.map((keyframe) => ({ ...keyframe })),
+  };
+}
+
+function cloneDraftCurveSet(curveSet: TrackCurveSet): TrackCurveSet {
+  return {
+    pitch: cloneDraftCurve(curveSet.pitch),
+    volume: cloneDraftCurve(curveSet.volume),
+  };
+}
+
+function createListDraft(track: Track): CurveSetDraft {
+  return {
+    traction: cloneDraftCurveSet(track.curveSets.traction),
+    brake: cloneDraftCurveSet(track.curveSets.brake),
+  };
+}
+
+function getDraftKeyframe(
+  curveSet: CurveSetKind,
+  kind: CurveKind,
+  index: number,
+) {
+  return listDraft.value?.[curveSet][kind].keyframes[index] ?? null;
+}
+
+function sortDraftKeyframes(curveSet: CurveSetKind, kind: CurveKind) {
+  const curve = listDraft.value?.[curveSet][kind];
+  if (!curve) return;
+
+  curve.keyframes = [...curve.keyframes].sort((a, b) => a.speed - b.speed);
+}
+
+function normalizeDraftSpeed(value: number) {
+  return clamp(value, 0, editorStore.simulator.maxSpeed);
+}
+
+function normalizeDraftValue(kind: CurveKind, value: number) {
+  return clamp(value, 0, CURVE_MAX_VALUE[kind]);
+}
+
+function updateListCell(
+  curveSet: CurveSetKind,
+  kind: CurveKind,
+  index: number,
+  field: "speed" | "value",
+  event: Event,
+) {
+  const keyframe = getDraftKeyframe(curveSet, kind, index);
+  if (!keyframe) return;
+
+  const input = event.target as HTMLInputElement;
+  const value = Number(input.value);
+  if (!Number.isFinite(value)) return;
+
+  if (field === "speed") {
+    keyframe.speed = normalizeDraftSpeed(value);
+    sortDraftKeyframes(curveSet, kind);
+  } else {
+    keyframe.value = normalizeDraftValue(kind, value);
+  }
+}
+
+function openListEditor() {
+  const track = activeTrack.value;
+  if (!track) {
+    showToast("Select a track first");
+    return;
+  }
+
+  listEditorTrackId.value = track.id;
+  listDraft.value = createListDraft(track);
+  closeTransientMenus();
+  isListEditorOpen.value = true;
+}
+
+function cancelListEditor() {
+  isListEditorOpen.value = false;
+  listDraft.value = null;
+  listEditorTrackId.value = null;
+  closeTransientMenus();
+}
+
+function applyListEditor() {
+  if (!listDraft.value || !listEditorTrackId.value) return;
+
+  projectStore.replaceTrackCurveSets(listEditorTrackId.value, listDraft.value);
+  editorStore.clearSelection();
+  pushHistory("Apply list editor");
+  isListEditorOpen.value = false;
+  listDraft.value = null;
+  listEditorTrackId.value = null;
+  closeTransientMenus();
+  syncAudioPreview();
+  renderCurveCharts();
+}
+
+function openListContextMenu(
+  event: MouseEvent,
+  curveSet: CurveSetKind,
+  kind: CurveKind | null = null,
+  index: number | null = null,
+) {
+  event.preventDefault();
+  event.stopPropagation();
+  closeChartContextMenu();
+  closeAddKeyframePanel();
+  listContextMenu.visible = true;
+  listContextMenu.x = Math.min(event.clientX, window.innerWidth - 220);
+  listContextMenu.y = Math.min(event.clientY, window.innerHeight - 132);
+  listContextMenu.curveSet = curveSet;
+  listContextMenu.kind = kind;
+  listContextMenu.index = index;
+}
+
+function syncDraftCurveSets(source: CurveSetKind, target: CurveSetKind) {
+  const draft = listDraft.value;
+  if (!draft) return;
+
+  draft[target] = {
+    pitch: {
+      ...draft[source].pitch,
+      keyframes: draft[source].pitch.keyframes.map((keyframe) => ({
+        ...keyframe,
+        id: crypto.randomUUID(),
+      })),
+    },
+    volume: {
+      ...draft[source].volume,
+      keyframes: draft[source].volume.keyframes.map((keyframe) => ({
+        ...keyframe,
+        id: crypto.randomUUID(),
+      })),
+    },
+  };
+  closeListContextMenu();
+}
+
+function runListContextSync() {
+  if (listContextMenu.curveSet === "brake") {
+    syncDraftCurveSets("brake", "traction");
+  } else {
+    syncDraftCurveSets("traction", "brake");
+  }
+}
+
+function openListAddKeyframePanel() {
+  if (!listContextMenu.curveSet) return;
+
+  addKeyframePanel.visible = true;
+  addKeyframePanel.x = Math.min(listContextMenu.x + 16, window.innerWidth - 260);
+  addKeyframePanel.y = Math.min(listContextMenu.y + 36, window.innerHeight - 218);
+  addKeyframePanel.curveSet = listContextMenu.curveSet;
+  addKeyframePanel.kind = listContextMenu.kind ?? "volume";
+  addKeyframePanel.speed = "0";
+  addKeyframePanel.value = addKeyframePanel.kind === "pitch" ? "1" : "0";
+  closeListContextMenu();
+}
+
+function confirmListAddKeyframe() {
+  const draft = listDraft.value;
+  if (!draft) return;
+
+  const speed = Number(addKeyframePanel.speed);
+  const value = Number(addKeyframePanel.value);
+  if (!Number.isFinite(speed) || !Number.isFinite(value)) return;
+
+  draft[addKeyframePanel.curveSet][addKeyframePanel.kind].keyframes.push({
+    id: crypto.randomUUID(),
+    speed: normalizeDraftSpeed(speed),
+    value: normalizeDraftValue(addKeyframePanel.kind, value),
+  });
+  sortDraftKeyframes(addKeyframePanel.curveSet, addKeyframePanel.kind);
+  closeAddKeyframePanel();
+}
+
+function removeListContextKeyframe() {
+  const draft = listDraft.value;
+  const { curveSet, kind, index } = listContextMenu;
+  if (!draft || !curveSet || !kind || index === null) return;
+
+  const keyframe = getDraftKeyframe(curveSet, kind, index);
+  if (!keyframe) return;
+
+  draft[curveSet][kind].keyframes.splice(index, 1);
+  closeListContextMenu();
+}
+
+function runChartContextAddKeyframe() {
+  const runtime = chartContextMenu.chartKind
+    ? charts.get(chartContextMenu.chartKind)
+    : null;
+  if (!runtime) return;
+
+  addKeyframeAtChartPoint(
+    runtime,
+    chartContextMenu.speed,
+    chartContextMenu.value,
+  );
+  closeChartContextMenu();
+}
+
 function handleChartClick(runtime: ChartRuntime) {
+  closeTransientMenus();
+
   if (suppressNextChartClick) {
     suppressNextChartClick = false;
     return;
@@ -404,40 +753,21 @@ function handleChartClick(runtime: ChartRuntime) {
     pointer.x,
     pointer.y,
   );
-  const curve = active.curveSets[activeCurveSet.value][runtime.config.kind];
-  const keyframe = projectStore.addKeyframe(
-    active.id,
-    activeCurveSet.value,
-    runtime.config.kind,
-    point.speed,
-    Number.isFinite(point.value)
-      ? point.value
-      : sampleCurve(curve, point.speed),
-  );
-
-  if (keyframe) {
-    editorStore.selectKeyframe({
-      trackId: active.id,
-      curveSet: activeCurveSet.value,
-      kind: runtime.config.kind,
-      keyframeId: keyframe.id,
-    });
-    pushHistory("Add keyframe");
-  }
-
-  syncAudioPreview();
-  renderCurveCharts();
+  addKeyframeAtChartPoint(runtime, point.speed, point.value);
 }
 
-function handleChartContextMenu(runtime: ChartRuntime, target: Konva.Node) {
+function handleChartContextMenu(
+  runtime: ChartRuntime,
+  event: { target: Konva.Node; evt: MouseEvent },
+) {
   const active = activeTrack.value;
-  if (!active || active.visible === false) return;
-
+  const target = event.target;
   const trackId = target.attrs.trackId as string | undefined;
   const keyframeId = target.attrs.keyframeId as string | undefined;
 
   if (
     editorStore.view.tool === "keyframe" &&
+    active &&
     keyframeId &&
     trackId === active.id
   ) {
@@ -454,7 +784,19 @@ function handleChartContextMenu(runtime: ChartRuntime, target: Konva.Node) {
     return;
   }
 
-  showToast("List view menu reserved");
+  const pointer = runtime.stage.getPointerPosition();
+  const point = pointer
+    ? canvasToPoint(runtime.stage, runtime.config, pointer.x, pointer.y)
+    : { speed: editorStore.simulator.currentSpeed, value: 0 };
+
+  closeListContextMenu();
+  closeAddKeyframePanel();
+  chartContextMenu.visible = true;
+  chartContextMenu.x = Math.min(event.evt.clientX, window.innerWidth - 220);
+  chartContextMenu.y = Math.min(event.evt.clientY, window.innerHeight - 96);
+  chartContextMenu.chartKind = runtime.config.kind;
+  chartContextMenu.speed = point.speed;
+  chartContextMenu.value = point.value;
 }
 
 function renderCharts() {
@@ -570,12 +912,37 @@ function renderBackgroundChart(runtime: ChartRuntime) {
   backgroundLayer.draw();
 }
 
+function showKeyframeHoverHint(runtime: ChartRuntime, x: number, y: number) {
+  if (!runtime.hoverHint) {
+    runtime.hoverHint = new Konva.Text({
+      text: "-",
+      fontSize: 18,
+      fontStyle: "bold",
+      fill: "#FFE796",
+      listening: false,
+    });
+    runtime.interactionLayer.add(runtime.hoverHint);
+  }
+
+  runtime.hoverHint.position({ x: x + 10, y: y - 23 });
+  runtime.hoverHint.show();
+  runtime.interactionLayer.batchDraw();
+}
+
+function hideKeyframeHoverHint(runtime: ChartRuntime) {
+  if (!runtime.hoverHint) return;
+
+  runtime.hoverHint.hide();
+  runtime.interactionLayer.batchDraw();
+}
+
 function renderCurveChart(runtime: ChartRuntime) {
   const { stage, curveLayer, config } = runtime;
   const bounds = chartBounds(stage);
   const hasActiveTrack = activeTrackId.value !== null;
 
   curveLayer.destroyChildren();
+  hideKeyframeHoverHint(runtime);
   setStageCursor(runtime);
 
   tracks.value.filter(isVisibleTrack).forEach((track) => {
@@ -647,6 +1014,9 @@ function renderCurveChart(runtime: ChartRuntime) {
           runtime.stage.container().style.cursor = "pointer";
         } else if (canStartMove) {
           runtime.stage.container().style.cursor = "move";
+        } else if (editorStore.view.tool === "keyframe" && editable) {
+          runtime.stage.container().style.cursor = "pointer";
+          showKeyframeHoverHint(runtime, circle.x(), circle.y());
         }
 
         editorStore.hoverKeyframe({
@@ -657,6 +1027,7 @@ function renderCurveChart(runtime: ChartRuntime) {
         });
       });
       circle.on("mouseleave", () => {
+        hideKeyframeHoverHint(runtime);
         setStageCursor(runtime);
         editorStore.hoverKeyframe(null);
       });
@@ -1089,6 +1460,11 @@ function clearActiveSelection() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    closeTransientMenus();
+    return;
+  }
+
   if (
     event.target instanceof HTMLInputElement ||
     event.target instanceof HTMLTextAreaElement
@@ -1225,7 +1601,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="editor-shell">
+  <main class="editor-shell" @click="closeTransientMenus">
     <header class="titlebar" data-tauri-drag-region>
       <div class="title-lockup">
         <h1>BVE5 Motor Assistance</h1>
@@ -1545,6 +1921,322 @@ onBeforeUnmount(() => {
       <span class="version">v{{ APP_VERSION }}</span>
     </footer>
 
+    <div
+      v-if="chartContextMenu.visible"
+      class="context-menu chart-context-menu"
+      :style="{
+        left: `${chartContextMenu.x}px`,
+        top: `${chartContextMenu.y}px`,
+      }"
+      @click.stop
+    >
+      <button
+        type="button"
+        :disabled="!activeTrack"
+        @click="runChartContextAddKeyframe"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+        Add keyframe here
+      </button>
+      <button type="button" :disabled="!activeTrack" @click="openListEditor">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 6h14" />
+          <path d="M5 12h14" />
+          <path d="M5 18h14" />
+        </svg>
+        Open list view editor
+      </button>
+    </div>
+
+    <div
+      v-if="isListEditorOpen && listDraft"
+      class="modal-backdrop"
+      @click.self="cancelListEditor"
+      @click.stop
+    >
+      <section class="list-editor-dialog" aria-label="List view editor">
+        <header>
+          <div>
+            <h2>List View Editor</h2>
+            <span>{{ listEditorTrack?.name ?? "No active track" }}</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Close list editor"
+            @click="cancelListEditor"
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path d="m3 3 6 6M9 3 3 9" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="list-table-wrap">
+          <table class="list-editor-table">
+            <thead>
+              <tr>
+                <th colspan="4" @contextmenu="openListContextMenu($event, 'traction')">
+                  traction
+                </th>
+                <th colspan="4" @contextmenu="openListContextMenu($event, 'brake')">
+                  brake
+                </th>
+              </tr>
+              <tr>
+                <th>speed</th>
+                <th>vol</th>
+                <th>speed</th>
+                <th>pit</th>
+                <th>speed</th>
+                <th>vol</th>
+                <th>speed</th>
+                <th>pit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in listRows" :key="row">
+                <td @contextmenu="openListContextMenu($event, 'traction', 'volume', row)">
+                  <input
+                    v-if="getDraftKeyframe('traction', 'volume', row)"
+                    type="number"
+                    step="0.1"
+                    :value="
+                      getDraftKeyframe('traction', 'volume', row)?.speed ?? ''
+                    "
+                    @change="
+                      updateListCell(
+                        'traction',
+                        'volume',
+                        row,
+                        'speed',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'traction', 'volume', row)">
+                  <input
+                    v-if="getDraftKeyframe('traction', 'volume', row)"
+                    type="number"
+                    step="0.01"
+                    :value="
+                      getDraftKeyframe('traction', 'volume', row)?.value ?? ''
+                    "
+                    @change="
+                      updateListCell(
+                        'traction',
+                        'volume',
+                        row,
+                        'value',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'traction', 'pitch', row)">
+                  <input
+                    v-if="getDraftKeyframe('traction', 'pitch', row)"
+                    type="number"
+                    step="0.1"
+                    :value="
+                      getDraftKeyframe('traction', 'pitch', row)?.speed ?? ''
+                    "
+                    @change="
+                      updateListCell(
+                        'traction',
+                        'pitch',
+                        row,
+                        'speed',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'traction', 'pitch', row)">
+                  <input
+                    v-if="getDraftKeyframe('traction', 'pitch', row)"
+                    type="number"
+                    step="0.01"
+                    :value="
+                      getDraftKeyframe('traction', 'pitch', row)?.value ?? ''
+                    "
+                    @change="
+                      updateListCell(
+                        'traction',
+                        'pitch',
+                        row,
+                        'value',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'brake', 'volume', row)">
+                  <input
+                    v-if="getDraftKeyframe('brake', 'volume', row)"
+                    type="number"
+                    step="0.1"
+                    :value="getDraftKeyframe('brake', 'volume', row)?.speed ?? ''"
+                    @change="
+                      updateListCell(
+                        'brake',
+                        'volume',
+                        row,
+                        'speed',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'brake', 'volume', row)">
+                  <input
+                    v-if="getDraftKeyframe('brake', 'volume', row)"
+                    type="number"
+                    step="0.01"
+                    :value="getDraftKeyframe('brake', 'volume', row)?.value ?? ''"
+                    @change="
+                      updateListCell(
+                        'brake',
+                        'volume',
+                        row,
+                        'value',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'brake', 'pitch', row)">
+                  <input
+                    v-if="getDraftKeyframe('brake', 'pitch', row)"
+                    type="number"
+                    step="0.1"
+                    :value="getDraftKeyframe('brake', 'pitch', row)?.speed ?? ''"
+                    @change="
+                      updateListCell(
+                        'brake',
+                        'pitch',
+                        row,
+                        'speed',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+                <td @contextmenu="openListContextMenu($event, 'brake', 'pitch', row)">
+                  <input
+                    v-if="getDraftKeyframe('brake', 'pitch', row)"
+                    type="number"
+                    step="0.01"
+                    :value="getDraftKeyframe('brake', 'pitch', row)?.value ?? ''"
+                    @change="
+                      updateListCell(
+                        'brake',
+                        'pitch',
+                        row,
+                        'value',
+                        $event,
+                      )
+                    "
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer>
+          <button class="ghost" type="button" @click="cancelListEditor">
+            Cancel
+          </button>
+          <button class="primary" type="button" @click="applyListEditor">
+            Apply
+          </button>
+        </footer>
+      </section>
+    </div>
+
+    <div
+      v-if="listContextMenu.visible"
+      class="context-menu list-context-menu"
+      :style="{ left: `${listContextMenu.x}px`, top: `${listContextMenu.y}px` }"
+      @click.stop
+    >
+      <button type="button" @click="runListContextSync">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 7h11" />
+          <path d="m15 4 3 3-3 3" />
+          <path d="M17 17H6" />
+          <path d="m9 14-3 3 3 3" />
+        </svg>
+        {{ listSyncLabel }}
+      </button>
+      <button type="button" @click="openListAddKeyframePanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+        Add keyframe
+      </button>
+      <button
+        class="danger"
+        type="button"
+        :disabled="!canDeleteListContextKeyframe"
+        @click="removeListContextKeyframe"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 7h14" />
+          <path d="M9 7V4h6v3" />
+          <path d="M8 10v10h8V10" />
+        </svg>
+        Delete current keyframe
+      </button>
+    </div>
+
+    <form
+      v-if="addKeyframePanel.visible"
+      class="add-keyframe-panel"
+      :style="{ left: `${addKeyframePanel.x}px`, top: `${addKeyframePanel.y}px` }"
+      @submit.prevent="confirmListAddKeyframe"
+      @click.stop
+    >
+      <label>
+        <span>Type</span>
+        <select v-model="addKeyframePanel.kind">
+          <option value="volume">Volume</option>
+          <option value="pitch">Pitch</option>
+        </select>
+      </label>
+      <label>
+        <span>Speed</span>
+        <input
+          v-model="addKeyframePanel.speed"
+          type="number"
+          min="0"
+          :max="editorStore.simulator.maxSpeed"
+          step="0.1"
+        />
+      </label>
+      <label>
+        <span>Value</span>
+        <input
+          v-model="addKeyframePanel.value"
+          type="number"
+          min="0"
+          :max="CURVE_MAX_VALUE[addKeyframePanel.kind]"
+          step="0.01"
+        />
+      </label>
+      <footer>
+        <button class="ghost" type="button" @click="closeAddKeyframePanel">
+          Cancel
+        </button>
+        <button class="primary" type="submit">Add</button>
+      </footer>
+    </form>
+
     <p v-if="toast" class="toast" role="status">{{ toast }}</p>
   </main>
 </template>
@@ -1659,8 +2351,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   grid-row: 2;
   grid-column: 1;
+  overflow: hidden;
   background: #20262b;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  transition:
+    width 0.3s ease,
+    background 0.3s ease;
 }
 
 .tool-button {
@@ -1671,6 +2367,9 @@ onBeforeUnmount(() => {
   place-items: center;
   min-height: 78px;
   padding: 14px 6px;
+  transition:
+    background 0.3s ease,
+    opacity 0.2s ease;
 }
 
 .tool-button::before {
@@ -1682,6 +2381,7 @@ onBeforeUnmount(() => {
   content: "";
   background: #5d86cb;
   opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .tool-button.active::before {
@@ -1700,13 +2400,25 @@ onBeforeUnmount(() => {
 }
 
 .tool-button span:last-child {
+  max-height: 24px;
+  overflow: hidden;
   font-size: 15px;
   text-align: center;
+  white-space: nowrap;
+  transition:
+    opacity 0.2s ease,
+    max-height 0.2s ease,
+    margin 0.2s ease;
 }
 
 .toolbar-icon {
   width: 36px;
   height: 36px;
+  transition: transform 0.3s ease;
+}
+
+.tool-button:hover:not(:disabled) .toolbar-icon {
+  transform: scale(1.06);
 }
 
 .speed-readout {
@@ -2060,6 +2772,258 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.context-menu {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  gap: 3px;
+  width: 212px;
+  padding: 6px;
+  color: #f4f8fb;
+  background: #202b32;
+  border: 1px solid rgba(178, 213, 230, 0.16);
+  border-radius: 7px;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+}
+
+.context-menu button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+}
+
+.context-menu button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.context-menu button.danger {
+  color: #ffb8b8;
+}
+
+.context-menu svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(4, 9, 12, 0.58);
+  backdrop-filter: blur(6px);
+}
+
+.list-editor-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(980px, calc(100vw - 56px));
+  max-height: min(720px, calc(100vh - 78px));
+  min-height: 420px;
+  overflow: hidden;
+  background: #23313a;
+  border: 1px solid rgba(178, 213, 230, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+}
+
+.list-editor-dialog > header,
+.list-editor-dialog > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.list-editor-dialog > header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.list-editor-dialog h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.list-editor-dialog header span {
+  color: rgba(245, 248, 251, 0.62);
+}
+
+.list-editor-dialog header button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+}
+
+.list-editor-dialog header button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.list-editor-dialog header svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.list-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: #4c6070 transparent;
+  scrollbar-width: thin;
+}
+
+.list-editor-table {
+  width: 100%;
+  min-width: 840px;
+  border-spacing: 0;
+}
+
+.list-editor-table th,
+.list-editor-table td {
+  width: 12.5%;
+  height: 38px;
+  padding: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.list-editor-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: rgba(245, 248, 251, 0.78);
+  font-weight: 680;
+  text-transform: lowercase;
+  background: #1b2730;
+}
+
+.list-editor-table thead tr:first-child th {
+  top: 0;
+  color: #ffffff;
+  font-size: 17px;
+  background: #2c4050;
+}
+
+.list-editor-table thead tr:nth-child(2) th {
+  top: 38px;
+}
+
+.list-editor-table td {
+  background: rgba(15, 22, 26, 0.34);
+}
+
+.list-editor-table tr:nth-child(even) td {
+  background: rgba(20, 31, 38, 0.5);
+}
+
+.list-editor-table input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  color: #f5fbff;
+  background: #141e23;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  outline: none;
+}
+
+.list-editor-table input:focus {
+  border-color: rgba(139, 195, 224, 0.62);
+}
+
+.list-editor-dialog > footer {
+  gap: 10px;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.list-editor-dialog footer button,
+.add-keyframe-panel footer button {
+  height: 38px;
+  min-width: 86px;
+  padding: 0 16px;
+  color: inherit;
+  border-radius: 6px;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid rgba(178, 213, 230, 0.16);
+}
+
+.primary {
+  background: #3d6074;
+  border: 1px solid rgba(178, 213, 230, 0.18);
+}
+
+.add-keyframe-panel {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 10px;
+  width: 244px;
+  padding: 14px;
+  color: #f4f8fb;
+  background: #23313a;
+  border: 1px solid rgba(178, 213, 230, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 22px 62px rgba(0, 0, 0, 0.42);
+}
+
+.add-keyframe-panel label {
+  display: grid;
+  gap: 5px;
+  color: rgba(245, 248, 251, 0.72);
+  font-size: 14px;
+}
+
+.add-keyframe-panel input,
+.add-keyframe-panel select {
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  color: #f5fbff;
+  background: #141e23;
+  border: 1px solid rgba(178, 213, 230, 0.12);
+  border-radius: 5px;
+  outline: none;
+}
+
+.add-keyframe-panel footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .toast {
   position: fixed;
   right: 18px;
@@ -2072,5 +3036,96 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(178, 213, 230, 0.16);
   border-radius: 7px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+@media (max-width: 1040px) {
+  .editor-shell {
+    grid-template-columns: 64px minmax(360px, 1fr) 236px;
+    min-width: 760px;
+  }
+
+  .tool-button {
+    height: 72px;
+    min-height: 64px;
+    gap: 0;
+  }
+
+  .tool-button span:last-child,
+  .speed-readout > span,
+  .speed-readout small {
+    max-height: 0;
+    margin: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  .toolbar-icon {
+    transform: scale(0.9);
+  }
+
+  .speed-readout {
+    padding: 12px 4px;
+  }
+
+  .speed-readout label {
+    width: 56px;
+  }
+
+  .speed-readout input {
+    flex-basis: 52px;
+    font-size: 15px;
+    text-align: center;
+  }
+
+  .chart-workspace {
+    gap: 10px;
+    padding-right: 6px;
+  }
+
+  .transport-bar {
+    grid-template-columns: 58px minmax(220px, 300px) minmax(150px, auto) 1fr;
+    gap: 10px;
+    padding: 0 72px 0 18px;
+  }
+
+  .transport-field:nth-of-type(2) {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .editor-shell {
+    grid-template-columns: 64px minmax(320px, 1fr);
+    grid-template-rows:
+      var(--app-titlebar-height) minmax(0, 1fr) 246px
+      var(--app-bottombar-height);
+    min-width: 680px;
+  }
+
+  .chart-workspace {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .track-sidebar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-left: 0;
+  }
+
+  .transport-bar {
+    grid-row: 4;
+  }
+
+  .panel {
+    border-bottom: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .speed-readout input {
+  background: #1d97d4;
+}
 }
 </style>

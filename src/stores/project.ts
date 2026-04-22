@@ -16,6 +16,7 @@ import type {
   Keyframe,
   Track,
   TrackCurve,
+  TrackCurveSet,
 } from "@/types/track";
 import { createDefaultTrack, createProjectDocument } from "@/types/factories";
 import { sanitizeTrack } from "@/utils/clone";
@@ -62,6 +63,36 @@ function normalizeProjectDocument(document: ProjectDocument): ProjectDocument {
   });
 
   return document;
+}
+
+function normalizeCurveSetDraft(
+  curveSet: TrackCurveSet,
+  maxSpeed: number,
+): TrackCurveSet {
+  return {
+    pitch: {
+      ...curveSet.pitch,
+      kind: "pitch",
+      keyframes: sortKeyframesBySpeed(
+        curveSet.pitch.keyframes.map((keyframe) => ({
+          id: keyframe.id || crypto.randomUUID(),
+          speed: normalizeSpeed(keyframe.speed, maxSpeed),
+          value: normalizeKeyframeValue("pitch", keyframe.value),
+        })),
+      ),
+    },
+    volume: {
+      ...curveSet.volume,
+      kind: "volume",
+      keyframes: sortKeyframesBySpeed(
+        curveSet.volume.keyframes.map((keyframe) => ({
+          id: keyframe.id || crypto.randomUUID(),
+          speed: normalizeSpeed(keyframe.speed, maxSpeed),
+          value: normalizeKeyframeValue("volume", keyframe.value),
+        })),
+      ),
+    },
+  };
 }
 
 function channelToHex(value: number): string {
@@ -483,6 +514,23 @@ export const useProjectStore = defineStore("project", () => {
     }
   }
 
+  function replaceTrackCurveSets(
+    trackId: ID,
+    curveSets: Record<CurveSetKind, TrackCurveSet>,
+  ) {
+    if (!document.value) return;
+
+    const track = document.value.tracks.tracks.find((item) => item.id === trackId);
+    if (!track) return;
+
+    const maxSpeed = document.value.project.meta.maxSpeed;
+    track.curveSets = {
+      traction: normalizeCurveSetDraft(curveSets.traction, maxSpeed),
+      brake: normalizeCurveSetDraft(curveSets.brake, maxSpeed),
+    };
+    markDirty();
+  }
+
   function replaceDocument(next: ProjectDocument) {
     revokeDocumentObjectUrls(document.value);
     document.value = normalizeProjectDocument(next);
@@ -521,6 +569,7 @@ export const useProjectStore = defineStore("project", () => {
     updateKeyframe,
     moveKeyframeDraft,
     removeKeyframe,
+    replaceTrackCurveSets,
     replaceDocument,
   };
 });

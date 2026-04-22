@@ -1,50 +1,26 @@
 import { APP_VERSION, PROJECT_SCHEMA_VERSION } from "./project";
 import type { CreateProjectPayload, ProjectDocument } from "./project";
-import type {
-  CurveKind,
-  Keyframe,
-  Track,
-  TrackCurve,
-  TrackCurveSet,
-} from "./track";
+import type { CurveKind, Track, TrackCurve, TrackCurveSet } from "./track";
 import type { EditorRuntimeState } from "./editor";
 
-function createKeyframes(kind: CurveKind, maxSpeed: number): Keyframe[] {
-  if (kind === "pitch") {
-    return [
-      { id: crypto.randomUUID(), speed: 0, value: 1 },
-      { id: crypto.randomUUID(), speed: maxSpeed * 0.2, value: 1.5 },
-      { id: crypto.randomUUID(), speed: maxSpeed * 0.5, value: 1 },
-      { id: crypto.randomUUID(), speed: maxSpeed, value: 0.55 },
-    ];
-  }
-
-  return [
-    { id: crypto.randomUUID(), speed: 0, value: 0 },
-    { id: crypto.randomUUID(), speed: maxSpeed * 0.08, value: 0.9 },
-    { id: crypto.randomUUID(), speed: maxSpeed * 0.5, value: 1 },
-    { id: crypto.randomUUID(), speed: maxSpeed, value: 1 },
-  ];
-}
-
-function createDefaultCurve(kind: CurveKind, maxSpeed: number): TrackCurve {
+function createDefaultCurve(kind: CurveKind): TrackCurve {
   return {
     kind,
     interpolation: "linear",
-    keyframes: createKeyframes(kind, maxSpeed),
+    keyframes: [],
   };
 }
 
-function createDefaultCurveSet(maxSpeed: number): TrackCurveSet {
+function createDefaultCurveSet(): TrackCurveSet {
   return {
-    pitch: createDefaultCurve("pitch", maxSpeed),
-    volume: createDefaultCurve("volume", maxSpeed),
+    pitch: createDefaultCurve("pitch"),
+    volume: createDefaultCurve("volume"),
   };
 }
 
 export function createDefaultTrack(
   name = "Track 1",
-  maxSpeed = 120,
+  _maxSpeed = 120,
   color = "#60A5FA",
 ): Track {
   return {
@@ -57,8 +33,8 @@ export function createDefaultTrack(
     visible: true,
     locked: false,
     curveSets: {
-      traction: createDefaultCurveSet(maxSpeed),
-      brake: createDefaultCurveSet(maxSpeed),
+      traction: createDefaultCurveSet(),
+      brake: createDefaultCurveSet(),
     },
   };
 }
