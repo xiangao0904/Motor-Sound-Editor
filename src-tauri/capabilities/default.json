@@ -5,6 +5,10 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "dialog:default",
+    "fs:read-files",
+    "fs:write-files",
+    "fs:read-meta",
     "opener:default",
     "core:window:allow-minimize", 
     "core:window:allow-maximize",

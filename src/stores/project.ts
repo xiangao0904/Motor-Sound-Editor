@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { clamp } from "@/utils/math";
+import { CURVE_MAX_VALUE } from "@/constants/curveRanges";
 
 import type { ID } from "@/types/common";
 import type { CreateProjectPayload, ProjectDocument } from "@/types/project";
@@ -13,7 +14,7 @@ import type {
   TrackCurve,
 } from "@/types/track";
 import { createDefaultTrack, createProjectDocument } from "@/types/factories";
-import { deepClone } from "@/utils/clone";
+import { sanitizeTrack } from "@/utils/clone";
 
 function normalizeSpeed(speed: number, maxSpeed: number): number {
   return clamp(Number.isFinite(speed) ? speed : 0, 0, maxSpeed);
@@ -21,12 +22,7 @@ function normalizeSpeed(speed: number, maxSpeed: number): number {
 
 function normalizeKeyframeValue(kind: CurveKind, value: number): number {
   const safeValue = Number.isFinite(value) ? value : 0;
-
-  if (kind === "volume") {
-    return clamp(safeValue, 0, 1);
-  }
-
-  return clamp(safeValue, 0, 4);
+  return clamp(safeValue, 0, CURVE_MAX_VALUE[kind]);
 }
 
 function sortKeyframesBySpeed(keyframes: Keyframe[]): Keyframe[] {
@@ -54,6 +50,55 @@ function normalizeTrackCurves(track: Track, maxSpeed: number) {
       );
     });
   });
+}
+
+function channelToHex(value: number): string {
+  return Math.round(value).toString(16).padStart(2, "0").toUpperCase();
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const segment = hue / 60;
+  const second = chroma * (1 - Math.abs((segment % 2) - 1));
+  const match = l - chroma / 2;
+
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (segment >= 0 && segment < 1) {
+    red = chroma;
+    green = second;
+  } else if (segment < 2) {
+    red = second;
+    green = chroma;
+  } else if (segment < 3) {
+    green = chroma;
+    blue = second;
+  } else if (segment < 4) {
+    green = second;
+    blue = chroma;
+  } else if (segment < 5) {
+    red = second;
+    blue = chroma;
+  } else {
+    red = chroma;
+    blue = second;
+  }
+
+  return `#${channelToHex((red + match) * 255)}${channelToHex(
+    (green + match) * 255,
+  )}${channelToHex((blue + match) * 255)}`;
+}
+
+function createRandomTrackColor(): string {
+  const hue = Math.random() * 360;
+  const saturation = 70 + Math.random() * 20;
+  const lightness = 65 + Math.random() * 15;
+
+  return hslToHex(hue, saturation, lightness);
 }
 
 export const useProjectStore = defineStore("project", () => {
@@ -109,6 +154,14 @@ export const useProjectStore = defineStore("project", () => {
     currentFilePath.value = filePath;
   }
 
+  function markSaved(filePath?: string) {
+    if (filePath !== undefined) {
+      currentFilePath.value = filePath;
+    }
+
+    dirty.value = false;
+  }
+
   function setProjectMeta(
     patch: Partial<
       Pick<
@@ -149,9 +202,11 @@ export const useProjectStore = defineStore("project", () => {
   function addTrack(name?: string) {
     if (!document.value) return null;
 
+    const trackIndex = document.value.tracks.tracks.length;
     const track = createDefaultTrack(
-      name ?? `motor${document.value.tracks.tracks.length + 1}`,
+      name ?? `motor${trackIndex}`,
       document.value.project.meta.maxSpeed,
+      createRandomTrackColor(),
     );
     document.value.tracks.tracks.push(track);
 
@@ -188,7 +243,7 @@ export const useProjectStore = defineStore("project", () => {
     );
     if (!source) return null;
 
-    const duplicated: Track = deepClone(source);
+    const duplicated: Track = sanitizeTrack(source);
     duplicated.id = crypto.randomUUID();
     duplicated.name = `${source.name} Copy`;
 
@@ -422,6 +477,7 @@ export const useProjectStore = defineStore("project", () => {
     loadProject,
     createNewProject,
     setProjectFilePath,
+    markSaved,
     setProjectMeta,
     addTrack,
     removeTrack,

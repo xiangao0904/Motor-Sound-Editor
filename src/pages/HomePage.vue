@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { APP_VERSION } from "@/types/project";
+import type { ProjectCardItem } from "@/types/project";
+import {
+  ensureBmsExtension,
+  openBmsProject,
+  readFileModifiedAt,
+  saveBmsProject,
+} from "@/services/bmsProject";
+import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useProjectStore } from "@/stores/project";
+import { useRecentProjectsStore } from "@/stores/recentProjects";
+import { createProjectPreview } from "@/utils/projectPreview";
 
 import iconNewFile from "@/assets/icons/newfile.png";
 import iconOpenFile from "@/assets/icons/openfile.png";
@@ -10,20 +21,13 @@ import iconSettings from "@/assets/icons/settings.png";
 
 type SortKey = "date" | "name";
 
-interface RecentProject {
-  id: string;
-  name: string;
-  filePath: string;
-  lastModified: string;
-  pitch: number[];
-  volume: number[];
-}
-
 const emit = defineEmits<{
   "open-editor": [];
 }>();
 
 const projectStore = useProjectStore();
+const assetPayloadStore = useAssetPayloadStore();
+const recentProjectsStore = useRecentProjectsStore();
 
 const searchQuery = ref("");
 const sortKey = ref<SortKey>("date");
@@ -31,7 +35,6 @@ const contextProjectId = ref<string | null>(null);
 const contextMenu = reactive({ visible: false, x: 0, y: 0 });
 const isCreateDialogOpen = ref(false);
 const toast = ref("");
-const fileInput = ref<HTMLInputElement | null>(null);
 
 const newProject = reactive({
   name: "",
@@ -39,64 +42,17 @@ const newProject = reactive({
   acceleration: 1.2,
 });
 
-const recentProjects = ref<RecentProject[]>([
-  {
-    id: "als-vvvf",
-    name: "Alstom VVVF",
-    filePath: "D:/BVE/Sounds/Alstom VVVF",
-    lastModified: "2021-12-23",
-    pitch: [78, 32, 20, 37, 48, 58, 64, 69, 72],
-    volume: [82, 47, 40, 35, 33, 30, 28, 27, 26],
-  },
-  {
-    id: "siemens-gto",
-    name: "Siemens GTO",
-    filePath: "D:/BVE/Sounds/Siemens GTO",
-    lastModified: "2021-12-23",
-    pitch: [79, 34, 19, 25, 50, 60, 67, 72, 75],
-    volume: [83, 35, 28, 45, 55, 62, 68, 71, 73],
-  },
-  {
-    id: "mitsubishi-gto",
-    name: "Mitsubishi GTO",
-    filePath: "D:/BVE/Sounds/Mitsubishi GTO",
-    lastModified: "2021-12-23",
-    pitch: [80, 38, 19, 34, 46, 54, 61, 67, 70],
-    volume: [81, 36, 26, 23, 45, 57, 64, 68, 69],
-  },
-  {
-    id: "e233-series",
-    name: "E233 Series",
-    filePath: "D:/BVE/Sounds/E233 Series",
-    lastModified: "2021-12-23",
-    pitch: [78, 33, 22, 40, 50, 59, 63, 66, 69],
-    volume: [82, 45, 35, 30, 28, 27, 26, 25, 25],
-  },
-  {
-    id: "e233-series-alt",
-    name: "E233 Series",
-    filePath: "D:/BVE/Sounds/E233 Series Alt",
-    lastModified: "2021-12-23",
-    pitch: [82, 42, 22, 34, 45, 55, 61, 65, 68],
-    volume: [84, 47, 43, 39, 34, 31, 28, 27, 26],
-  },
-  {
-    id: "mitsubishi-gto-low",
-    name: "Mitsubishi GTO",
-    filePath: "D:/BVE/Sounds/Mitsubishi GTO Low",
-    lastModified: "2021-12-23",
-    pitch: [82, 23, 23, 41, 52, 61, 66, 70, 72],
-    volume: [82, 31, 22, 20, 39, 52, 61, 67, 70],
-  },
-]);
-
 const filteredProjects = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase();
+  const source =
+    sortKey.value === "date"
+      ? recentProjectsStore.sortedByDate
+      : recentProjectsStore.projects;
   const list = query
-    ? recentProjects.value.filter((project) =>
+    ? source.filter((project) =>
         project.name.toLocaleLowerCase().includes(query),
       )
-    : [...recentProjects.value];
+    : [...source];
 
   return list.sort((a, b) => {
     if (sortKey.value === "name") {
@@ -111,7 +67,7 @@ const filteredProjects = computed(() => {
 
 const contextProject = computed(
   () =>
-    recentProjects.value.find(
+    recentProjectsStore.projects.find(
       (project) => project.id === contextProjectId.value,
     ) ?? null,
 );
@@ -127,6 +83,22 @@ function linePoints(values: number[]): string {
     .join(" ");
 }
 
+function formatProjectTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}/${month}/${day} ${hours}:${minutes}`;
+}
+
 function showToast(message: string) {
   toast.value = message;
   window.setTimeout(() => {
@@ -134,18 +106,6 @@ function showToast(message: string) {
       toast.value = "";
     }
   }, 2200);
-}
-
-function seedTracks() {
-  if (projectStore.tracks.length > 0) return;
-
-  const colors = ["#FFE796", "#8BB3FF", "#84D26D", "#F28B82"];
-  colors.forEach((color, index) => {
-    const track = projectStore.addTrack(`motor${index + 1}`);
-    if (track) {
-      projectStore.updateTrack(track.id, { color });
-    }
-  });
 }
 
 function openCreateDialog() {
@@ -157,79 +117,93 @@ function closeCreateDialog() {
   isCreateDialogOpen.value = false;
 }
 
-function createProject() {
+async function createProject() {
   const name = newProject.name.trim() || "Untitled Project";
 
-  projectStore.createNewProject({
-    name,
-    maxSpeed: newProject.maxSpeed,
-    acceleration: newProject.acceleration,
-  });
-  seedTracks();
-  const today = new Date().toISOString().slice(0, 10);
-
-  recentProjects.value.unshift({
-    id: crypto.randomUUID(),
-    name,
-    filePath: "Unsaved project",
-    lastModified: today,
-    pitch: [80, 38, 24, 32, 48, 58, 64, 69, 72],
-    volume: [82, 48, 38, 34, 31, 29, 28, 27, 26],
+  const selected = await save({
+    title: "Create BMS Project",
+    defaultPath: `${name}.bms`,
+    filters: [{ name: "BMS Project", extensions: ["bms"] }],
   });
 
-  newProject.name = "";
-  newProject.maxSpeed = 120;
-  newProject.acceleration = 1.2;
-  closeCreateDialog();
-  emit("open-editor");
+  if (!selected) return;
+
+  const filePath = ensureBmsExtension(selected);
+
+  try {
+    projectStore.createNewProject({
+      name,
+      maxSpeed: newProject.maxSpeed,
+      acceleration: newProject.acceleration,
+    });
+    assetPayloadStore.clear();
+
+    const document = projectStore.document;
+    if (!document) return;
+
+    await saveBmsProject(document, filePath, assetPayloadStore.payloads);
+    projectStore.markSaved(filePath);
+    recentProjectsStore.upsertProject({
+      name,
+      filePath,
+      lastModified: await readFileModifiedAt(filePath),
+      ...createProjectPreview(document),
+    });
+
+    newProject.name = "";
+    newProject.maxSpeed = 120;
+    newProject.acceleration = 1.2;
+    closeCreateDialog();
+    emit("open-editor");
+  } catch (error) {
+    console.error("Project create failed", error);
+    projectStore.clearProject();
+    assetPayloadStore.clear();
+    showToast("Project could not be created");
+  }
 }
 
-function browseFile() {
+async function browseFile() {
   closeContextMenu();
-  fileInput.value?.click();
-}
 
-function importFile(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-
-  if (!file) return;
-
-  recentProjects.value.unshift({
-    id: crypto.randomUUID(),
-    name: file.name.replace(/\.bms$/i, ""),
-    filePath: file.name,
-    lastModified: new Date(file.lastModified || Date.now())
-      .toISOString()
-      .slice(0, 10),
-    pitch: [80, 30, 22, 35, 47, 55, 61, 66, 70],
-    volume: [83, 45, 36, 31, 28, 26, 25, 25, 24],
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "BMS Project", extensions: ["bms"] }],
   });
 
-  projectStore.createNewProject({
-    name: file.name.replace(/\.bms$/i, ""),
-    maxSpeed: 120,
-    acceleration: 1.2,
-  });
-  projectStore.setProjectFilePath(file.name);
-  seedTracks();
-  input.value = "";
-  emit("open-editor");
+  if (typeof selected !== "string") return;
+  await openProjectPath(selected);
 }
 
-function openProject(project: RecentProject) {
+async function openProjectPath(filePath: string) {
+  try {
+    const loaded = await openBmsProject(filePath);
+    projectStore.loadProject(loaded.document, filePath);
+    assetPayloadStore.clear();
+    loaded.assetPayloads.forEach((bytes, assetId) => {
+      assetPayloadStore.setPayload(assetId, bytes);
+    });
+
+    recentProjectsStore.upsertProject({
+      name: loaded.document.project.meta.name,
+      filePath,
+      lastModified: await readFileModifiedAt(filePath),
+      ...createProjectPreview(loaded.document),
+    });
+    emit("open-editor");
+  } catch (error) {
+    console.error("Project open failed", error);
+    showToast("Project could not be opened");
+  }
+}
+
+function openProject(project: ProjectCardItem) {
   closeContextMenu();
-  projectStore.createNewProject({
-    name: project.name,
-    maxSpeed: 120,
-    acceleration: 1.2,
-  });
-  projectStore.setProjectFilePath(project.filePath);
-  seedTracks();
-  emit("open-editor");
+  void openProjectPath(project.filePath);
 }
 
-function openContextMenu(event: MouseEvent, project: RecentProject) {
+function openContextMenu(event: MouseEvent, project: ProjectCardItem) {
   event.preventDefault();
   contextProjectId.value = project.id;
   contextMenu.x = Math.min(event.clientX, window.innerWidth - 176);
@@ -252,9 +226,7 @@ function deleteProject() {
   if (!contextProject.value) return;
 
   const removedName = contextProject.value.name;
-  recentProjects.value = recentProjects.value.filter(
-    (project) => project.id !== contextProject.value?.id,
-  );
+  recentProjectsStore.removeProject(contextProject.value.id);
   showToast(`${removedName} removed`);
   closeContextMenu();
 }
@@ -368,16 +340,16 @@ async function closeWindow() {
               <svg viewBox="0 0 100 100" preserveAspectRatio="none">
                 <polyline
                   class="preview-line pitch"
-                  :points="linePoints(project.pitch)"
+                  :points="linePoints(project.previewPitch ?? [])"
                 />
                 <polyline
                   class="preview-line volume"
-                  :points="linePoints(project.volume)"
+                  :points="linePoints(project.previewVolume ?? [])"
                 />
               </svg>
             </div>
             <h2>{{ project.name }}</h2>
-            <p>Last modified: {{ project.lastModified.split("-").join("/") }}</p>
+            <p>Last modified: {{ formatProjectTime(project.lastModified) }}</p>
           </article>
 
           <div v-if="filteredProjects.length === 0" class="empty-state">
@@ -472,14 +444,6 @@ async function closeWindow() {
     </div>
 
     <p v-if="toast" class="toast" role="status">{{ toast }}</p>
-
-    <input
-      ref="fileInput"
-      class="file-input"
-      type="file"
-      accept=".bms"
-      @change="importFile"
-    />
   </main>
 </template>
 

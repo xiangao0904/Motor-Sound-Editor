@@ -1,14 +1,55 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::fs;
+use std::path::Path;
+use std::time::UNIX_EPOCH;
+
+fn ensure_bms_path(path: &str) -> Result<(), String> {
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+
+    if extension.eq_ignore_ascii_case("bms") {
+        Ok(())
+    } else {
+        Err("Only .bms files are supported".to_string())
+    }
+}
+
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+fn read_bms_file(path: String) -> Result<Vec<u8>, String> {
+    ensure_bms_path(&path)?;
+    fs::read(path).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn write_bms_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    ensure_bms_path(&path)?;
+    fs::write(path, bytes).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn read_bms_modified_at(path: String) -> Result<u64, String> {
+    ensure_bms_path(&path)?;
+    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+    let modified_at = metadata.modified().map_err(|error| error.to_string())?;
+    let duration = modified_at
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?;
+
+    Ok(duration.as_millis() as u64)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            read_bms_file,
+            write_bms_file,
+            read_bms_modified_at
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

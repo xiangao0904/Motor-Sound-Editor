@@ -46,6 +46,8 @@ export interface ProjectCardItem {
   filePath: string;
   lastModified: ISODateString;
   previewImagePath?: string;
+  previewPitch?: number[];
+  previewVolume?: number[];
 }
 
 /** 新建工程参数 */

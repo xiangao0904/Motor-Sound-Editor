@@ -42,11 +42,15 @@ function createDefaultCurveSet(maxSpeed: number): TrackCurveSet {
   };
 }
 
-export function createDefaultTrack(name = "Track 1", maxSpeed = 120): Track {
+export function createDefaultTrack(
+  name = "Track 1",
+  maxSpeed = 120,
+  color = "#60A5FA",
+): Track {
   return {
     id: crypto.randomUUID(),
     name,
-    color: "#60A5FA",
+    color,
     assetId: null,
     enabled: true,
     mute: false,
@@ -63,6 +67,11 @@ export function createProjectDocument(
   payload: CreateProjectPayload,
 ): ProjectDocument {
   const now = new Date().toISOString();
+  const defaultTrack = createDefaultTrack(
+    "motor0",
+    payload.maxSpeed ?? 120,
+    "#FFE796",
+  );
 
   return {
     project: {
@@ -80,8 +89,8 @@ export function createProjectDocument(
       },
     },
     tracks: {
-      activeTrackId: null,
-      tracks: [],
+      activeTrackId: defaultTrack.id,
+      tracks: [defaultTrack],
       assets: [],
     },
   };

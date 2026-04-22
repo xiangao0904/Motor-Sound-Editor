@@ -8,11 +8,16 @@ import {
   ref,
   watch,
 } from "vue";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { fileNameFromPath } from "@/services/bmsProject";
+import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
 import { useProjectStore } from "@/stores/project";
 import { AudioPreviewEngine } from "@/services/audioPreview";
+import { CURVE_MAX_VALUE } from "@/constants/curveRanges";
 import { APP_VERSION } from "@/types/project";
 import type {
   CurveKind,
@@ -31,7 +36,7 @@ import iconKeyframe from "@/assets/icons/keyframe.png";
 import iconPreviewOpen from "@/assets/icons/preview-open.png";
 import iconPreviewClose from "@/assets/icons/preview-close.png";
 
-const emit = defineEmits<{ "return-home": [] }>();
+const emit = defineEmits<{ "return-home": []; "save-project": [] }>();
 
 interface ChartConfig {
   kind: CurveKind;
@@ -47,13 +52,13 @@ interface ChartRuntime {
 }
 
 const projectStore = useProjectStore();
+const assetPayloadStore = useAssetPayloadStore();
 const editorStore = useEditorStore();
 const historyStore = useHistoryStore();
 const audioEngine = new AudioPreviewEngine();
 
 const pitchChartEl = ref<HTMLDivElement | null>(null);
 const volumeChartEl = ref<HTMLDivElement | null>(null);
-const audioInput = ref<HTMLInputElement | null>(null);
 const speedDraft = ref("0.0");
 const toast = ref("");
 
@@ -61,19 +66,22 @@ const charts = new Map<CurveKind, ChartRuntime>();
 const resizeObservers: ResizeObserver[] = [];
 let animationFrame: number | null = null;
 let lastFrameTime = 0;
+let isPreparingKeyframeDrag = false;
 let isDraggingKeyframe = false;
+let suppressNextChartClick = false;
+let draggingCircle: Konva.Circle | null = null;
 
 const pitchConfig: ChartConfig = {
   kind: "pitch",
   label: "Pitch",
   unit: "Hz",
-  maxValue: 3.5,
+  maxValue: CURVE_MAX_VALUE.pitch,
 };
 const volumeConfig: ChartConfig = {
   kind: "volume",
   label: "Volume",
   unit: "dB",
-  maxValue: 2,
+  maxValue: CURVE_MAX_VALUE.volume,
 };
 
 const meta = computed(() => projectStore.meta);
@@ -188,7 +196,12 @@ function pointToCanvas(
   return { x, y };
 }
 
-function canvasToPoint(stage: Konva.Stage, config: ChartConfig, x: number, y: number) {
+function canvasToPoint(
+  stage: Konva.Stage,
+  config: ChartConfig,
+  x: number,
+  y: number,
+) {
   const bounds = chartBounds(stage);
   const maxSpeed = editorStore.simulator.maxSpeed || 1;
   const speed =
@@ -203,7 +216,11 @@ function canvasToPoint(stage: Konva.Stage, config: ChartConfig, x: number, y: nu
   return { speed, value };
 }
 
-function curvePoints(stage: Konva.Stage, config: ChartConfig, curve: TrackCurve) {
+function curvePoints(
+  stage: Konva.Stage,
+  config: ChartConfig,
+  curve: TrackCurve,
+) {
   return sortedKeyframes(curve).flatMap((keyframe) => {
     const point = pointToCanvas(stage, config, keyframe.speed, keyframe.value);
     return [point.x, point.y];
@@ -219,12 +236,7 @@ function isEditableTrack(track: Track) {
 }
 
 function setStageCursor(runtime: ChartRuntime) {
-  const canMove =
-    editorStore.view.tool === "move" &&
-    activeTrack.value !== null &&
-    activeTrack.value.visible !== false;
-
-  runtime.stage.container().style.cursor = canMove ? "move" : "default";
+  runtime.stage.container().style.cursor = "default";
 }
 
 function resizeStage(runtime: ChartRuntime, container: HTMLDivElement) {
@@ -262,7 +274,79 @@ function createStage(container: HTMLDivElement, config: ChartConfig) {
   renderChart(runtime);
 }
 
+function stopCurrentKeyframeDrag() {
+  if (!draggingCircle && !isDraggingKeyframe && !isPreparingKeyframeDrag) return;
+
+  const circle = draggingCircle;
+  draggingCircle = null;
+
+  if (circle?.isDragging()) {
+    circle.stopDrag();
+  }
+
+  isPreparingKeyframeDrag = false;
+  isDraggingKeyframe = false;
+  suppressNextChartClick = false;
+  charts.forEach((runtime) => setStageCursor(runtime));
+}
+
+function isSameSelectedKeyframe(
+  runtime: ChartRuntime,
+  trackId: string,
+  keyframeId: string,
+) {
+  const selected = selectedKeyframe.value;
+  if (!selected) return false;
+  return (
+    selected.trackId === trackId &&
+    selected.curveSet === activeCurveSet.value &&
+    selected.kind === runtime.config.kind &&
+    selected.keyframeId === keyframeId
+  );
+}
+
+function isMoveableSelectedKeyframe(
+  runtime: ChartRuntime,
+  track: Track,
+  keyframeId: string,
+) {
+  return (
+    editorStore.view.tool === "move" &&
+    isEditableTrack(track) &&
+    track.locked !== true &&
+    isSameSelectedKeyframe(runtime, track.id, keyframeId)
+  );
+}
+
+function stepMode(direction: "up" | "down") {
+  const mode = editorStore.simulator.mode;
+
+  if (direction === "up") {
+    if (mode === "brake") {
+      setMode("coasting");
+      return;
+    }
+    if (mode === "coasting") {
+      setMode("traction");
+    }
+    return;
+  }
+
+  if (mode === "traction") {
+    setMode("coasting");
+    return;
+  }
+  if (mode === "coasting") {
+    setMode("brake");
+  }
+}
+
 function handleChartClick(runtime: ChartRuntime) {
+  if (suppressNextChartClick) {
+    suppressNextChartClick = false;
+    return;
+  }
+
   const pointer = runtime.stage.getPointerPosition();
   if (!pointer || isDraggingKeyframe) return;
 
@@ -273,15 +357,22 @@ function handleChartClick(runtime: ChartRuntime) {
 
   if (editorStore.view.tool === "select") {
     if (trackId && (!active || active.id === trackId)) {
+      const shouldClearSelectedKeyframe =
+        keyframeId && isSameSelectedKeyframe(runtime, trackId, keyframeId);
+
       activateTrack(trackId);
 
       if (keyframeId) {
-        editorStore.selectKeyframe({
-          trackId,
-          curveSet: activeCurveSet.value,
-          kind: runtime.config.kind,
-          keyframeId,
-        });
+        if (shouldClearSelectedKeyframe) {
+          editorStore.selectKeyframe(null);
+        } else {
+          editorStore.selectKeyframe({
+            trackId,
+            curveSet: activeCurveSet.value,
+            kind: runtime.config.kind,
+            keyframeId,
+          });
+        }
       }
 
       renderCharts();
@@ -315,14 +406,21 @@ function handleChartClick(runtime: ChartRuntime) {
 
   if (editorStore.view.tool !== "keyframe") return;
 
-  const point = canvasToPoint(runtime.stage, runtime.config, pointer.x, pointer.y);
+  const point = canvasToPoint(
+    runtime.stage,
+    runtime.config,
+    pointer.x,
+    pointer.y,
+  );
   const curve = active.curveSets[activeCurveSet.value][runtime.config.kind];
   const keyframe = projectStore.addKeyframe(
     active.id,
     activeCurveSet.value,
     runtime.config.kind,
     point.speed,
-    Number.isFinite(point.value) ? point.value : sampleCurve(curve, point.speed),
+    Number.isFinite(point.value)
+      ? point.value
+      : sampleCurve(curve, point.speed),
   );
 
   if (keyframe) {
@@ -468,8 +566,9 @@ function renderChart(runtime: ChartRuntime) {
     const selectable =
       editorStore.view.tool === "select" && (!hasActiveTrack || editable);
 
+    let line: Konva.Line | null = null;
     if (points.length >= 4) {
-      const line = new Konva.Line({
+      line = new Konva.Line({
         points,
         stroke: track.color,
         strokeWidth: 3,
@@ -487,14 +586,21 @@ function renderChart(runtime: ChartRuntime) {
     }
 
     keyframes.forEach((keyframe) => {
-      const point = pointToCanvas(stage, config, keyframe.speed, keyframe.value);
-      const isSelected =
-        editable &&
-        selectedKeyframe.value?.keyframeId === keyframe.id &&
-        selectedKeyframe.value.trackId === track.id &&
-        selectedKeyframe.value.kind === config.kind;
-      const draggable = editorStore.view.tool === "move" && editable;
-      const keyframeSelectable = selectable || draggable || editorStore.view.tool === "keyframe";
+      const initialSpeed = keyframe.speed;
+      const initialValue = keyframe.value;
+      const point = pointToCanvas(
+        stage,
+        config,
+        keyframe.speed,
+        keyframe.value,
+      );
+      const isSelected = editable && isSameSelectedKeyframe(runtime, track.id, keyframe.id);
+      const canStartMove =
+        editorStore.view.tool === "move" && editable && track.locked !== true;
+      const keyframeSelectable =
+        selectable ||
+        canStartMove ||
+        editorStore.view.tool === "keyframe";
       const circle = new Konva.Circle({
         x: point.x,
         y: point.y,
@@ -503,23 +609,21 @@ function renderChart(runtime: ChartRuntime) {
         stroke: "#FFFFFF",
         strokeWidth: isSelected ? 2 : 0,
         opacity,
-        draggable,
         listening: keyframeSelectable && (!hasActiveTrack || editable),
+        draggable: canStartMove,
+        dragBoundFunc: (position) => ({
+          x: clamp(position.x, bounds.left, bounds.right),
+          y: clamp(position.y, bounds.top, bounds.bottom),
+        }),
         keyframeId: keyframe.id,
         trackId: track.id,
         curveKind: config.kind,
-        dragBoundFunc(position) {
-          return {
-            x: clamp(position.x, bounds.left, bounds.right),
-            y: clamp(position.y, bounds.top, bounds.bottom),
-          };
-        },
       });
 
       circle.on("mouseenter", () => {
         if (editorStore.view.tool === "select" && selectable) {
           runtime.stage.container().style.cursor = "pointer";
-        } else if (draggable) {
+        } else if (canStartMove) {
           runtime.stage.container().style.cursor = "move";
         }
 
@@ -534,56 +638,113 @@ function renderChart(runtime: ChartRuntime) {
         setStageCursor(runtime);
         editorStore.hoverKeyframe(null);
       });
-      circle.on("dragstart", () => {
-        isDraggingKeyframe = true;
+      circle.on("mousedown touchstart", () => {
+        if (!canStartMove) return;
+
+        isPreparingKeyframeDrag = true;
         editorStore.selectKeyframe({
           trackId: track.id,
           curveSet: activeCurveSet.value,
           kind: config.kind,
           keyframeId: keyframe.id,
         });
+        runtime.stage.container().style.cursor = "move";
+      });
+      circle.on("dragstart", () => {
+        isPreparingKeyframeDrag = false;
+        if (!isMoveableSelectedKeyframe(runtime, track, keyframe.id)) {
+          circle.stopDrag();
+          return;
+        }
+
+        isDraggingKeyframe = true;
+        draggingCircle = circle;
+        editorStore.selectKeyframe({
+          trackId: track.id,
+          curveSet: activeCurveSet.value,
+          kind: config.kind,
+          keyframeId: keyframe.id,
+        });
+        runtime.stage.container().style.cursor = "move";
       });
       circle.on("dragmove", () => {
-        const next = canvasToPoint(stage, config, circle.x(), circle.y());
+        if (!isMoveableSelectedKeyframe(runtime, track, keyframe.id)) return;
+
+        const position = circle.position();
+        const movedPoint = canvasToPoint(
+          stage,
+          config,
+          position.x,
+          position.y,
+        );
         projectStore.moveKeyframeDraft(
           track.id,
           activeCurveSet.value,
           config.kind,
           keyframe.id,
-          next,
+          { speed: movedPoint.speed, value: movedPoint.value },
         );
 
-        const activeLine = layer
-          .find("Line")
-          .find(
-            (node) =>
-              node.attrs.trackId === track.id &&
-              node.attrs.curveKind === config.kind,
-          ) as Konva.Line | undefined;
+        const currentTrack = tracks.value.find((item) => item.id === track.id);
+        const currentCurve =
+          currentTrack?.curveSets[activeCurveSet.value]?.[config.kind];
+        if (line && currentCurve) {
+          line.points(curvePoints(stage, config, currentCurve));
+        }
 
-        activeLine?.points(curvePoints(stage, config, curve));
         syncAudioPreview();
         layer.batchDraw();
       });
       circle.on("dragend", () => {
-        const next = canvasToPoint(stage, config, circle.x(), circle.y());
-        projectStore.updateKeyframe(
-          track.id,
-          activeCurveSet.value,
-          config.kind,
-          keyframe.id,
-          next,
-        );
-        editorStore.selectKeyframe({
-          trackId: track.id,
-          curveSet: activeCurveSet.value,
-          kind: config.kind,
-          keyframeId: keyframe.id,
-        });
-        pushHistory("Move keyframe");
-        isDraggingKeyframe = false;
-        syncAudioPreview();
-        renderCharts();
+        try {
+          const currentTrack = tracks.value.find((item) => item.id === track.id);
+          const currentCurve =
+            currentTrack?.curveSets[activeCurveSet.value]?.[config.kind];
+          const currentKeyframe = currentCurve?.keyframes.find(
+            (item) => item.id === keyframe.id,
+          );
+
+          if (currentTrack && currentCurve && currentKeyframe) {
+            const position = circle.position();
+            const finalPoint = canvasToPoint(
+              stage,
+              config,
+              position.x,
+              position.y,
+            );
+            const changed =
+              Math.abs(finalPoint.speed - initialSpeed) > 0.0001 ||
+              Math.abs(finalPoint.value - initialValue) > 0.0001;
+
+            projectStore.updateKeyframe(
+              track.id,
+              activeCurveSet.value,
+              config.kind,
+              keyframe.id,
+              { speed: finalPoint.speed, value: finalPoint.value },
+            );
+            editorStore.selectKeyframe({
+              trackId: track.id,
+              curveSet: activeCurveSet.value,
+              kind: config.kind,
+              keyframeId: keyframe.id,
+            });
+            if (changed) {
+              pushHistory("Move keyframe");
+            }
+          }
+        } finally {
+          isPreparingKeyframeDrag = false;
+          isDraggingKeyframe = false;
+          draggingCircle = null;
+          suppressNextChartClick = true;
+          window.setTimeout(() => {
+            suppressNextChartClick = false;
+          }, 0);
+          syncAudioPreview();
+          setStageCursor(runtime);
+          renderCharts();
+        }
       });
 
       layer.add(circle);
@@ -667,7 +828,9 @@ function tick(timestamp: number) {
 
   editorStore.setCurrentSpeed(nextSpeed);
   syncAudioPreview();
-  renderCharts();
+  if (!isDraggingKeyframe) {
+    renderCharts();
+  }
 
   if (hitLimit) {
     pauseTransport();
@@ -689,6 +852,7 @@ function setTool(tool: "select" | "move" | "keyframe") {
     return;
   }
 
+  stopCurrentKeyframeDrag();
   editorStore.setTool(tool);
   renderCharts();
 }
@@ -718,6 +882,7 @@ function updateAcceleration(event: Event) {
 }
 
 function activateTrack(trackId: string | null) {
+  stopCurrentKeyframeDrag();
   projectStore.setActiveTrack(trackId);
   editorStore.setActiveTrackId(trackId);
 
@@ -792,45 +957,62 @@ function toggleTrackVisible(trackId: string) {
   renderCharts();
 }
 
-function browseAudioFile() {
-  if (!activeTrack.value) {
+async function browseAudioFile() {
+  const track = activeTrack.value;
+  if (!track) {
     showToast("Select a track first");
     return;
   }
 
-  audioInput.value?.click();
-}
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "Audio", extensions: ["wav", "ogg"] }],
+  });
 
-function importAudioFile(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  const track = activeTrack.value;
+  if (typeof selected !== "string") return;
 
-  if (!file || !track) return;
-
-  const extension = file.name.split(".").pop()?.toLowerCase();
+  const fileName = fileNameFromPath(selected);
+  const extension = fileName.split(".").pop()?.toLowerCase();
   if (extension !== "wav" && extension !== "ogg") {
     showToast("Only wav and ogg files are supported");
-    input.value = "";
     return;
   }
 
+  let bytes: Uint8Array;
+  try {
+    bytes = await readFile(selected);
+  } catch {
+    showToast("Audio file could not be read");
+    return;
+  }
+
+  const buffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  );
+  const objectUrl = URL.createObjectURL(
+    new Blob([buffer], {
+      type: extension === "wav" ? "audio/wav" : "audio/ogg",
+    }),
+  );
   const asset = projectStore.addAsset({
-    fileName: file.name,
-    originalPath: file.name,
-    packagedPath: `Assets/${file.name}`,
-    objectUrl: URL.createObjectURL(file),
+    fileName,
+    originalPath: selected,
+    packagedPath: `Assets/${crypto.randomUUID()}-${fileName}`,
+    objectUrl,
     format: extension,
-    size: file.size,
+    size: bytes.byteLength,
   });
 
   if (asset) {
+    assetPayloadStore.setPayload(asset.id, bytes);
     projectStore.setTrackAsset(track.id, asset.id);
     pushHistory("Assign audio file");
-    showToast(`${file.name} assigned`);
+    showToast(`${fileName} assigned`);
+  } else {
+    URL.revokeObjectURL(objectUrl);
   }
-
-  input.value = "";
 }
 
 function updateSelectedPoint(axis: "speed" | "value", event: Event) {
@@ -868,41 +1050,28 @@ function deleteSelectedPoint() {
 }
 
 function exportReserved() {
-  showToast("Export File is reserved");
+  emit("save-project");
 }
 
 function clearActiveSelection() {
+  if (selectedKeyframe.value) {
+    editorStore.selectKeyframe(null);
+    renderCharts();
+    return;
+  }
+
   activateTrack(null);
 }
 
-function applyUndo() {
-  const document = projectStore.document;
-  if (!document) return;
-
-  const snapshot = historyStore.undo(document, editorStore.runtime);
-  if (!snapshot) return;
-
-  projectStore.replaceDocument(snapshot.document);
-  editorStore.replaceRuntime(snapshot.editor);
-  syncAudioPreview();
-  renderCharts();
-}
-
-function applyRedo() {
-  const document = projectStore.document;
-  if (!document) return;
-
-  const snapshot = historyStore.redo(document, editorStore.runtime);
-  if (!snapshot) return;
-
-  projectStore.replaceDocument(snapshot.document);
-  editorStore.replaceRuntime(snapshot.editor);
-  syncAudioPreview();
-  renderCharts();
-}
-
 function handleKeydown(event: KeyboardEvent) {
-  if (event.target instanceof HTMLInputElement) return;
+  if (
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement
+  ) {
+    return;
+  }
+
+  const withCommand = event.ctrlKey || event.metaKey;
 
   if (event.code === "Space") {
     event.preventDefault();
@@ -910,27 +1079,36 @@ function handleKeydown(event: KeyboardEvent) {
     return;
   }
 
-  if (event.ctrlKey && event.key.toLowerCase() === "d") {
+  if (!withCommand && !event.altKey && event.key.toLowerCase() === "w") {
+    event.preventDefault();
+    stepMode("up");
+    return;
+  }
+
+  if (!withCommand && !event.altKey && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    stepMode("down");
+    return;
+  }
+
+  if (withCommand && event.key.toLowerCase() === "d") {
     event.preventDefault();
     clearActiveSelection();
-    return;
-  }
-
-  if (event.ctrlKey && event.key.toLowerCase() === "z") {
-    event.preventDefault();
-    applyUndo();
-    return;
-  }
-
-  if (event.ctrlKey && event.key.toLowerCase() === "y") {
-    event.preventDefault();
-    applyRedo();
     return;
   }
 
   if (event.key === "Delete") {
     deleteSelectedPoint();
   }
+}
+
+function handleGlobalPointerRelease() {
+  if (isPreparingKeyframeDrag && !isDraggingKeyframe) {
+    isPreparingKeyframeDrag = false;
+    return;
+  }
+
+  stopCurrentKeyframeDrag();
 }
 
 function goHome() {
@@ -961,7 +1139,7 @@ watch(
 watch(
   () => [projectStore.tracks, editorStore.runtime] as const,
   () => {
-    if (isDraggingKeyframe) return;
+    if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
 
     renderCharts();
     if (editorStore.playback.transport === "playing") {
@@ -977,15 +1155,28 @@ onMounted(() => {
     if (volumeChartEl.value) createStage(volumeChartEl.value, volumeConfig);
   });
   window.addEventListener("keydown", handleKeydown);
+  window.addEventListener("pointerup", handleGlobalPointerRelease);
+  window.addEventListener("pointercancel", handleGlobalPointerRelease);
+  window.addEventListener("mouseup", handleGlobalPointerRelease);
+  window.addEventListener("touchend", handleGlobalPointerRelease);
+  window.addEventListener("touchcancel", handleGlobalPointerRelease);
+  window.addEventListener("blur", handleGlobalPointerRelease);
 });
 
 onBeforeUnmount(() => {
   stopAnimationLoop();
   audioEngine.dispose();
+  stopCurrentKeyframeDrag();
   charts.forEach(({ stage }) => stage.destroy());
   charts.clear();
   resizeObservers.forEach((observer) => observer.disconnect());
   window.removeEventListener("keydown", handleKeydown);
+  window.removeEventListener("pointerup", handleGlobalPointerRelease);
+  window.removeEventListener("pointercancel", handleGlobalPointerRelease);
+  window.removeEventListener("mouseup", handleGlobalPointerRelease);
+  window.removeEventListener("touchend", handleGlobalPointerRelease);
+  window.removeEventListener("touchcancel", handleGlobalPointerRelease);
+  window.removeEventListener("blur", handleGlobalPointerRelease);
 });
 </script>
 
@@ -997,11 +1188,21 @@ onBeforeUnmount(() => {
         <span>{{ meta?.name ?? "Untitled" }}</span>
       </div>
       <div class="window-controls">
-        <button type="button" aria-label="Minimize" @click.stop="minimizeWindow">
+        <button
+          type="button"
+          aria-label="Minimize"
+          @click.stop="minimizeWindow"
+        >
           <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" /></svg>
         </button>
-        <button type="button" aria-label="Maximize" @click.stop="toggleMaximizeWindow">
-          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3h6v6H3z" /></svg>
+        <button
+          type="button"
+          aria-label="Maximize"
+          @click.stop="toggleMaximizeWindow"
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M3 3h6v6H3z" />
+          </svg>
         </button>
         <button type="button" aria-label="Close" @click.stop="closeWindow">
           <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -1022,24 +1223,28 @@ onBeforeUnmount(() => {
         <span>Select Mode</span>
       </button>
       <button
-      class="tool-button"
-      :class="{ active: editorStore.view.tool === 'move' }"
-      type="button"
-      :disabled="!activeTrack"
-      @click="setTool('move')"
+        class="tool-button"
+        :class="{ active: editorStore.view.tool === 'move' }"
+        type="button"
+        :disabled="!activeTrack"
+        @click="setTool('move')"
       >
-
-      <img :src="iconMove" class="toolbar-icon" alt="" aria-hidden="true" />
-      <span>Move Mode</span>
-    </button>
-    <button
-    class="tool-button"
-    :class="{ active: editorStore.view.tool === 'keyframe' }"
-    type="button"
-    :disabled="!activeTrack"
-    @click="setTool('keyframe')"
-    >
-    <img :src="iconKeyframe" class="toolbar-icon" alt="" aria-hidden="true" />
+        <img :src="iconMove" class="toolbar-icon" alt="" aria-hidden="true" />
+        <span>Move Mode</span>
+      </button>
+      <button
+        class="tool-button"
+        :class="{ active: editorStore.view.tool === 'keyframe' }"
+        type="button"
+        :disabled="!activeTrack"
+        @click="setTool('keyframe')"
+      >
+        <img
+          :src="iconKeyframe"
+          class="toolbar-icon"
+          alt=""
+          aria-hidden="true"
+        />
         <span>Keyframe</span>
       </button>
 
@@ -1079,8 +1284,12 @@ onBeforeUnmount(() => {
     </aside>
 
     <section class="chart-workspace">
-      <div class="chart-panel"><div ref="pitchChartEl" class="chart-host" /></div>
-      <div class="chart-panel"><div ref="volumeChartEl" class="chart-host" /></div>
+      <div class="chart-panel">
+        <div ref="pitchChartEl" class="chart-host" />
+      </div>
+      <div class="chart-panel">
+        <div ref="volumeChartEl" class="chart-host" />
+      </div>
     </section>
 
     <aside class="track-sidebar">
@@ -1088,7 +1297,9 @@ onBeforeUnmount(() => {
         <header>
           <h2>Track Layers</h2>
           <div class="track-actions">
-            <button type="button" aria-label="Add track" @click="addTrack">+</button>
+            <button type="button" aria-label="Add track" @click="addTrack">
+              +
+            </button>
             <button
               type="button"
               aria-label="Delete active track"
@@ -1103,7 +1314,9 @@ onBeforeUnmount(() => {
         <select
           class="active-select"
           :value="activeTrackId ?? ''"
-          @change="activateTrack(($event.target as HTMLSelectElement).value || null)"
+          @change="
+            activateTrack(($event.target as HTMLSelectElement).value || null)
+          "
         >
           <option value="">None</option>
           <option v-for="track in tracks" :key="track.id" :value="track.id">
@@ -1145,7 +1358,9 @@ onBeforeUnmount(() => {
               @click.stop="toggleTrackVisible(track.id)"
             >
               <img
-                :src="track.visible === false ? iconPreviewClose : iconPreviewOpen"
+                :src="
+                  track.visible === false ? iconPreviewClose : iconPreviewOpen
+                "
                 alt=""
               />
             </button>
@@ -1158,7 +1373,11 @@ onBeforeUnmount(() => {
         <template v-if="activeTrack">
           <label>
             <span>Name</span>
-            <input :value="activeTrack.name" type="text" @change="updateTrackName" />
+            <input
+              :value="activeTrack.name"
+              type="text"
+              @change="updateTrackName"
+            />
           </label>
           <label>
             <span>Color</span>
@@ -1219,7 +1438,10 @@ onBeforeUnmount(() => {
 
     <footer class="transport-bar">
       <button class="play-button" type="button" @click="toggleTransport">
-        <svg v-if="editorStore.playback.transport !== 'playing'" viewBox="0 0 24 24">
+        <svg
+          v-if="editorStore.playback.transport !== 'playing'"
+          viewBox="0 0 24 24"
+        >
           <path d="M8 5v14l11-7z" />
         </svg>
         <svg v-else viewBox="0 0 24 24">
@@ -1279,13 +1501,6 @@ onBeforeUnmount(() => {
       <span class="version">v{{ APP_VERSION }}</span>
     </footer>
 
-    <input
-      ref="audioInput"
-      class="file-input"
-      type="file"
-      accept=".wav,.ogg,audio/wav,audio/ogg"
-      @change="importAudioFile"
-    />
     <p v-if="toast" class="toast" role="status">{{ toast }}</p>
   </main>
 </template>
@@ -1416,10 +1631,10 @@ onBeforeUnmount(() => {
 
 .tool-button::before {
   position: absolute;
-  top: 22px;
-  bottom: 22px;
+  top: 0px;
+  bottom: 0px;
   left: 0;
-  width: 4px;
+  width: 5px;
   content: "";
   background: #5d86cb;
   opacity: 0;
@@ -1463,7 +1678,6 @@ onBeforeUnmount(() => {
 .speed-readout label {
   display: flex;
   width: 112px;
-  gap: 5px;
   align-items: baseline;
   justify-content: center;
   margin: 0 auto;
@@ -1474,7 +1688,7 @@ onBeforeUnmount(() => {
   flex: 0 0 72px;
   min-width: 0;
   color: #ffffff;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 760;
   text-align: right;
   background: transparent;
@@ -1510,6 +1724,7 @@ onBeforeUnmount(() => {
 .chart-host {
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 .track-sidebar {

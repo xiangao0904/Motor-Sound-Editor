@@ -4,17 +4,26 @@ import { defineStore } from "pinia";
 import type { EditorRuntimeState } from "@/types/editor";
 import type { HistorySnapshot } from "@/types/history";
 import type { ProjectDocument } from "@/types/project";
-import { deepClone } from "@/utils/clone";
+import {
+  sanitizeEditorRuntime,
+  sanitizeProjectDocument,
+} from "@/utils/clone";
 
 export const useHistoryStore = defineStore("history", () => {
   const undoStack = ref<HistorySnapshot[]>([]);
   const redoStack = ref<HistorySnapshot[]>([]);
-  const maxSteps = ref(50);
+  const maxSteps = ref(20);
+  let debounceTimer: number | null = null;
 
   const canUndo = computed(() => undoStack.value.length > 1);
   const canRedo = computed(() => redoStack.value.length > 0);
 
   function clear() {
+    if (debounceTimer !== null) {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+
     undoStack.value = [];
     redoStack.value = [];
   }
@@ -34,8 +43,8 @@ export const useHistoryStore = defineStore("history", () => {
     return {
       label,
       timestamp: Date.now(),
-      document: deepClone(document),
-      editor: deepClone(editor),
+      document: sanitizeProjectDocument(document),
+      editor: sanitizeEditorRuntime(editor),
     };
   }
 
@@ -46,14 +55,35 @@ export const useHistoryStore = defineStore("history", () => {
   ) {
     if (!document) return;
 
-    const snapshot = createSnapshot(label, document, editor);
-    undoStack.value.push(snapshot);
+    try {
+      const snapshot = createSnapshot(label, document, editor);
+      undoStack.value.push(snapshot);
+    } catch (error) {
+      console.error("History snapshot failed", error);
+      return;
+    }
 
     if (undoStack.value.length > maxSteps.value) {
       undoStack.value.shift();
     }
 
     redoStack.value = [];
+  }
+
+  function scheduleSnapshot(
+    label: string,
+    document: ProjectDocument | null,
+    editor: EditorRuntimeState,
+    debounceMs = 250,
+  ) {
+    if (debounceTimer !== null) {
+      window.clearTimeout(debounceTimer);
+    }
+
+    debounceTimer = window.setTimeout(() => {
+      pushSnapshot(label, document, editor);
+      debounceTimer = null;
+    }, debounceMs);
   }
 
   function undo(
@@ -76,8 +106,8 @@ export const useHistoryStore = defineStore("history", () => {
     if (!previous) return null;
 
     return {
-      document: deepClone(previous.document),
-      editor: deepClone(previous.editor),
+      document: sanitizeProjectDocument(previous.document),
+      editor: sanitizeEditorRuntime(previous.editor),
       label: previous.label,
     };
   }
@@ -97,8 +127,8 @@ export const useHistoryStore = defineStore("history", () => {
     undoStack.value.push(currentSnapshot);
 
     return {
-      document: deepClone(next.document),
-      editor: deepClone(next.editor),
+      document: sanitizeProjectDocument(next.document),
+      editor: sanitizeEditorRuntime(next.editor),
       label: next.label,
     };
   }
@@ -113,6 +143,7 @@ export const useHistoryStore = defineStore("history", () => {
     clear,
     setMaxSteps,
     pushSnapshot,
+    scheduleSnapshot,
     undo,
     redo,
   };
