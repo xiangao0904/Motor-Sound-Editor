@@ -13,6 +13,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createObjectUrl, fileNameFromPath } from "@/services/bmsProject";
+import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
@@ -219,6 +220,16 @@ function pushHistory(label: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function roundToTwo(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function formatTwoDecimals(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(2)
+    : "";
 }
 
 function sortedKeyframes(curve: TrackCurve): Keyframe[] {
@@ -478,7 +489,11 @@ function cloneDraftCurve(curve: TrackCurve): TrackCurve {
   return {
     kind: curve.kind,
     interpolation: curve.interpolation,
-    keyframes: curve.keyframes.map((keyframe) => ({ ...keyframe })),
+    keyframes: curve.keyframes.map((keyframe) => ({
+      ...keyframe,
+      speed: roundToTwo(keyframe.speed),
+      value: roundToTwo(keyframe.value),
+    })),
   };
 }
 
@@ -512,11 +527,11 @@ function sortDraftKeyframes(curveSet: CurveSetKind, kind: CurveKind) {
 }
 
 function normalizeDraftSpeed(value: number) {
-  return clamp(value, 0, editorStore.simulator.maxSpeed);
+  return roundToTwo(clamp(value, 0, editorStore.simulator.maxSpeed));
 }
 
 function normalizeDraftValue(kind: CurveKind, value: number) {
-  return clamp(value, 0, CURVE_MAX_VALUE[kind]);
+  return roundToTwo(clamp(value, 0, CURVE_MAX_VALUE[kind]));
 }
 
 function updateListCell(
@@ -524,13 +539,11 @@ function updateListCell(
   kind: CurveKind,
   index: number,
   field: "speed" | "value",
-  event: Event,
+  value: number,
 ) {
   const keyframe = getDraftKeyframe(curveSet, kind, index);
   if (!keyframe) return;
 
-  const input = event.target as HTMLInputElement;
-  const value = Number(input.value);
   if (!Number.isFinite(value)) return;
 
   if (field === "speed") {
@@ -603,6 +616,8 @@ function syncDraftCurveSets(source: CurveSetKind, target: CurveSetKind) {
       keyframes: draft[source].pitch.keyframes.map((keyframe) => ({
         ...keyframe,
         id: crypto.randomUUID(),
+        speed: roundToTwo(keyframe.speed),
+        value: roundToTwo(keyframe.value),
       })),
     },
     volume: {
@@ -610,6 +625,8 @@ function syncDraftCurveSets(source: CurveSetKind, target: CurveSetKind) {
       keyframes: draft[source].volume.keyframes.map((keyframe) => ({
         ...keyframe,
         id: crypto.randomUUID(),
+        speed: roundToTwo(keyframe.speed),
+        value: roundToTwo(keyframe.value),
       })),
     },
   };
@@ -632,8 +649,8 @@ function openListAddKeyframePanel() {
   addKeyframePanel.y = Math.min(listContextMenu.y + 36, window.innerHeight - 218);
   addKeyframePanel.curveSet = listContextMenu.curveSet;
   addKeyframePanel.kind = listContextMenu.kind ?? "volume";
-  addKeyframePanel.speed = "0";
-  addKeyframePanel.value = addKeyframePanel.kind === "pitch" ? "1" : "0";
+  addKeyframePanel.speed = "0.00";
+  addKeyframePanel.value = addKeyframePanel.kind === "pitch" ? "1.00" : "0.00";
   closeListContextMenu();
 }
 
@@ -1261,25 +1278,21 @@ function setTool(tool: "select" | "move" | "keyframe") {
   renderCurveCharts();
 }
 
-function commitSpeed() {
-  editorStore.setCurrentSpeed(Number(speedDraft.value));
+function commitSpeed(value: number) {
+  editorStore.setCurrentSpeed(value);
   speedDraft.value = editorStore.simulator.currentSpeed.toFixed(1);
   syncAudioPreview();
   renderPlayheads();
 }
 
-function updateMaxSpeed(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const value = Number(input.value);
+function updateMaxSpeed(value: number) {
   projectStore.setProjectMeta({ maxSpeed: value });
   editorStore.setMaxSpeed(value);
   pushHistory("Update max speed");
   renderCharts();
 }
 
-function updateAcceleration(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const value = Number(input.value);
+function updateAcceleration(value: number) {
   projectStore.setProjectMeta({ acceleration: value });
   editorStore.setAcceleration(value);
   pushHistory("Update acceleration");
@@ -1411,12 +1424,10 @@ async function browseAudioFile() {
   }
 }
 
-function updateSelectedPoint(axis: "speed" | "value", event: Event) {
+function updateSelectedPoint(axis: "speed" | "value", value: number) {
   const selected = selectedKeyframe.value;
   if (!selected) return;
 
-  const input = event.target as HTMLInputElement;
-  const value = Number(input.value);
   projectStore.updateKeyframe(
     selected.trackId,
     selected.curveSet,
@@ -1671,14 +1682,13 @@ onBeforeUnmount(() => {
       <div class="speed-readout">
         <span>Current Speed</span>
         <label>
-          <input
+          <StyledNumberInput
             v-model="speedDraft"
-            type="number"
             min="0"
             :max="editorStore.simulator.maxSpeed"
             step="0.1"
-            @change="commitSpeed"
-            @keydown.enter.prevent="commitSpeed"
+            aria-label="Current speed"
+            @commit="commitSpeed"
           />
           <small>km/h</small>
         </label>
@@ -1821,26 +1831,26 @@ onBeforeUnmount(() => {
           <label>
             <span>X</span>
             <div class="unit-input">
-              <input
-                :value="selectedPoint?.speed.toFixed(2) ?? ''"
-                type="number"
+              <StyledNumberInput
+                :model-value="selectedPoint?.speed.toFixed(2) ?? ''"
                 min="0"
                 :max="editorStore.simulator.maxSpeed"
                 step="0.1"
                 :disabled="!selectedPoint"
-                @change="updateSelectedPoint('speed', $event)"
+                aria-label="Selected keyframe speed"
+                @commit="updateSelectedPoint('speed', $event)"
               />
               <small>km/h</small>
             </div>
           </label>
           <label>
             <span>Y</span>
-            <input
-              :value="selectedPoint?.value.toFixed(2) ?? ''"
-              type="number"
+            <StyledNumberInput
+              :model-value="selectedPoint?.value.toFixed(2) ?? ''"
               step="0.01"
               :disabled="!selectedPoint"
-              @change="updateSelectedPoint('value', $event)"
+              aria-label="Selected keyframe value"
+              @commit="updateSelectedPoint('value', $event)"
             />
           </label>
           <button
@@ -1895,24 +1905,24 @@ onBeforeUnmount(() => {
 
       <label class="transport-field">
         <span>Max Speed</span>
-        <input
-          :value="editorStore.simulator.maxSpeed"
-          type="number"
+        <StyledNumberInput
+          :model-value="editorStore.simulator.maxSpeed"
           min="1"
           step="1"
-          @change="updateMaxSpeed"
+          aria-label="Max speed"
+          @commit="updateMaxSpeed"
         />
         <small>km/h</small>
       </label>
 
       <label class="transport-field">
         <span>Acceleration</span>
-        <input
-          :value="editorStore.simulator.acceleration"
-          type="number"
+        <StyledNumberInput
+          :model-value="editorStore.simulator.acceleration"
           min="0"
           step="0.1"
-          @change="updateAcceleration"
+          aria-label="Acceleration"
+          @commit="updateAcceleration"
         />
         <small>m/s²</small>
       </label>
@@ -1955,7 +1965,10 @@ onBeforeUnmount(() => {
       v-if="isListEditorOpen && listDraft"
       class="modal-backdrop"
       @click.self="cancelListEditor"
-      @click.stop
+      @click.stop="
+        closeListContextMenu();
+        closeAddKeyframePanel();
+      "
     >
       <section class="list-editor-dialog" aria-label="List view editor">
         <header>
@@ -1999,14 +2012,16 @@ onBeforeUnmount(() => {
             <tbody>
               <tr v-for="row in listRows" :key="row">
                 <td @contextmenu="openListContextMenu($event, 'traction', 'volume', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('traction', 'volume', row)"
-                    type="number"
-                    step="0.1"
-                    :value="
-                      getDraftKeyframe('traction', 'volume', row)?.speed ?? ''
+                    step="0.01"
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('traction', 'volume', row)?.speed,
+                      )
                     "
-                    @change="
+                    aria-label="Traction volume speed"
+                    @commit="
                       updateListCell(
                         'traction',
                         'volume',
@@ -2018,14 +2033,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'traction', 'volume', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('traction', 'volume', row)"
-                    type="number"
                     step="0.01"
-                    :value="
-                      getDraftKeyframe('traction', 'volume', row)?.value ?? ''
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('traction', 'volume', row)?.value,
+                      )
                     "
-                    @change="
+                    aria-label="Traction volume value"
+                    @commit="
                       updateListCell(
                         'traction',
                         'volume',
@@ -2037,14 +2054,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'traction', 'pitch', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('traction', 'pitch', row)"
-                    type="number"
-                    step="0.1"
-                    :value="
-                      getDraftKeyframe('traction', 'pitch', row)?.speed ?? ''
+                    step="0.01"
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('traction', 'pitch', row)?.speed,
+                      )
                     "
-                    @change="
+                    aria-label="Traction pitch speed"
+                    @commit="
                       updateListCell(
                         'traction',
                         'pitch',
@@ -2056,14 +2075,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'traction', 'pitch', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('traction', 'pitch', row)"
-                    type="number"
                     step="0.01"
-                    :value="
-                      getDraftKeyframe('traction', 'pitch', row)?.value ?? ''
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('traction', 'pitch', row)?.value,
+                      )
                     "
-                    @change="
+                    aria-label="Traction pitch value"
+                    @commit="
                       updateListCell(
                         'traction',
                         'pitch',
@@ -2075,12 +2096,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'brake', 'volume', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('brake', 'volume', row)"
-                    type="number"
-                    step="0.1"
-                    :value="getDraftKeyframe('brake', 'volume', row)?.speed ?? ''"
-                    @change="
+                    step="0.01"
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('brake', 'volume', row)?.speed,
+                      )
+                    "
+                    aria-label="Brake volume speed"
+                    @commit="
                       updateListCell(
                         'brake',
                         'volume',
@@ -2092,12 +2117,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'brake', 'volume', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('brake', 'volume', row)"
-                    type="number"
                     step="0.01"
-                    :value="getDraftKeyframe('brake', 'volume', row)?.value ?? ''"
-                    @change="
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('brake', 'volume', row)?.value,
+                      )
+                    "
+                    aria-label="Brake volume value"
+                    @commit="
                       updateListCell(
                         'brake',
                         'volume',
@@ -2109,12 +2138,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'brake', 'pitch', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('brake', 'pitch', row)"
-                    type="number"
-                    step="0.1"
-                    :value="getDraftKeyframe('brake', 'pitch', row)?.speed ?? ''"
-                    @change="
+                    step="0.01"
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('brake', 'pitch', row)?.speed,
+                      )
+                    "
+                    aria-label="Brake pitch speed"
+                    @commit="
                       updateListCell(
                         'brake',
                         'pitch',
@@ -2126,12 +2159,16 @@ onBeforeUnmount(() => {
                   />
                 </td>
                 <td @contextmenu="openListContextMenu($event, 'brake', 'pitch', row)">
-                  <input
+                  <StyledNumberInput
                     v-if="getDraftKeyframe('brake', 'pitch', row)"
-                    type="number"
                     step="0.01"
-                    :value="getDraftKeyframe('brake', 'pitch', row)?.value ?? ''"
-                    @change="
+                    :model-value="
+                      formatTwoDecimals(
+                        getDraftKeyframe('brake', 'pitch', row)?.value,
+                      )
+                    "
+                    aria-label="Brake pitch value"
+                    @commit="
                       updateListCell(
                         'brake',
                         'pitch',
@@ -2211,22 +2248,22 @@ onBeforeUnmount(() => {
       </label>
       <label>
         <span>Speed</span>
-        <input
+        <StyledNumberInput
           v-model="addKeyframePanel.speed"
-          type="number"
           min="0"
           :max="editorStore.simulator.maxSpeed"
-          step="0.1"
+          step="0.01"
+          aria-label="New keyframe speed"
         />
       </label>
       <label>
         <span>Value</span>
-        <input
+        <StyledNumberInput
           v-model="addKeyframePanel.value"
-          type="number"
           min="0"
           :max="CURVE_MAX_VALUE[addKeyframePanel.kind]"
           step="0.01"
+          aria-label="New keyframe value"
         />
       </label>
       <footer>
@@ -2433,23 +2470,20 @@ onBeforeUnmount(() => {
 
 .speed-readout label {
   display: flex;
-  width: 112px;
+  width: 116px;
   align-items: baseline;
   justify-content: center;
   margin: 0 auto;
   white-space: nowrap;
 }
 
-.speed-readout input {
+.speed-readout .styled-number {
   flex: 0 0 72px;
   min-width: 0;
-  color: #ffffff;
+  height: 34px;
   font-size: 20px;
   font-weight: 760;
   text-align: right;
-  background: transparent;
-  border: 0;
-  outline: none;
 }
 
 .speed-readout small {
@@ -2631,6 +2665,11 @@ onBeforeUnmount(() => {
   padding: 0 10px;
 }
 
+.track-details .styled-number {
+  width: 100%;
+  height: 30px;
+}
+
 .track-details input:disabled {
   color: rgba(255, 255, 255, 0.38);
 }
@@ -2752,6 +2791,11 @@ onBeforeUnmount(() => {
 .transport-field input {
   width: 74px;
   padding: 0 10px;
+}
+
+.transport-field .styled-number {
+  width: 82px;
+  height: 30px;
 }
 
 .mode-readout {
@@ -2897,8 +2941,6 @@ onBeforeUnmount(() => {
 .list-table-wrap {
   min-height: 0;
   overflow: auto;
-  scrollbar-color: #4c6070 transparent;
-  scrollbar-width: thin;
 }
 
 .list-editor-table {
@@ -2960,6 +3002,11 @@ onBeforeUnmount(() => {
   border-color: rgba(139, 195, 224, 0.62);
 }
 
+.list-editor-table .styled-number {
+  width: 100%;
+  height: 30px;
+}
+
 .list-editor-dialog > footer {
   gap: 10px;
   justify-content: flex-end;
@@ -3018,6 +3065,11 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
+.add-keyframe-panel .styled-number {
+  width: 100%;
+  height: 34px;
+}
+
 .add-keyframe-panel footer {
   display: flex;
   gap: 8px;
@@ -3071,7 +3123,7 @@ onBeforeUnmount(() => {
     width: 56px;
   }
 
-  .speed-readout input {
+  .speed-readout .styled-number {
     flex-basis: 52px;
     font-size: 15px;
     text-align: center;
@@ -3124,8 +3176,5 @@ onBeforeUnmount(() => {
     border-bottom: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
   }
-  .speed-readout input {
-  background: #1d97d4;
-}
 }
 </style>

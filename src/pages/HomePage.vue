@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { APP_VERSION } from "@/types/project";
 import type { ProjectCardItem } from "@/types/project";
 import {
@@ -115,6 +116,14 @@ function openCreateDialog() {
 
 function closeCreateDialog() {
   isCreateDialogOpen.value = false;
+}
+
+function updateNewProjectMaxSpeed(value: number) {
+  newProject.maxSpeed = value;
+}
+
+function updateNewProjectAcceleration(value: number) {
+  newProject.acceleration = value;
 }
 
 async function createProject() {
@@ -416,20 +425,22 @@ async function closeWindow() {
         <div class="dialog-grid">
           <label>
             <span>Max speed</span>
-            <input
-              v-model.number="newProject.maxSpeed"
+            <StyledNumberInput
+              :model-value="newProject.maxSpeed"
               min="1"
               step="1"
-              type="number"
+              aria-label="New project max speed"
+              @commit="updateNewProjectMaxSpeed"
             />
           </label>
           <label>
             <span>Acceleration</span>
-            <input
-              v-model.number="newProject.acceleration"
+            <StyledNumberInput
+              :model-value="newProject.acceleration"
               min="0.1"
               step="0.1"
-              type="number"
+              aria-label="New project acceleration"
+              @commit="updateNewProjectAcceleration"
             />
           </label>
         </div>
@@ -711,17 +722,6 @@ async function closeWindow() {
   height: calc(100% - 59px);
   padding-right: 16px;
   overflow-y: auto;
-  scrollbar-color: #4c6070 transparent;
-  scrollbar-width: thin;
-}
-
-.project-gallery::-webkit-scrollbar {
-  width: 9px;
-}
-
-.project-gallery::-webkit-scrollbar-thumb {
-  background: #4c6070;
-  border-radius: 10px;
 }
 
 .project-card {
@@ -955,6 +955,11 @@ async function closeWindow() {
   border: 1px solid rgba(178, 213, 230, 0.12);
   border-radius: 6px;
   outline: none;
+}
+
+.project-dialog .styled-number {
+  width: 100%;
+  height: 40px;
 }
 
 .project-dialog input:focus {
