@@ -987,12 +987,9 @@ async function browseAudioFile() {
     return;
   }
 
-  const buffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  );
+  
   const objectUrl = URL.createObjectURL(
-    new Blob([buffer], {
+    new Blob([bytes as any], { // 使用 as any 跳过严格的 ArrayBufferLike 检查
       type: extension === "wav" ? "audio/wav" : "audio/ogg",
     }),
   );
