@@ -1615,7 +1615,7 @@ onBeforeUnmount(() => {
   <main class="editor-shell" @click="closeTransientMenus">
     <header class="titlebar" data-tauri-drag-region>
       <div class="title-lockup">
-        <h1>BVE5 Motor Assistance</h1>
+        <h1>Motor Sound Editor</h1>
         <span>{{ meta?.name ?? "Untitled" }}</span>
       </div>
       <div class="window-controls">

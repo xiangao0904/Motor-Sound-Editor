@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "BVE5 Motor Assistance",
+  "productName": "Motor Sound Editor",
   "version": "0.1.0",
   "identifier": "com.hp.motor-sound-editor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "BVE5 Motor Assistance",
+        "title": "Motor Sound Editor",
         "width": 1376,
         "height": 768,
         "minWidth": 880,

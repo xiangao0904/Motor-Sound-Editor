@@ -256,7 +256,7 @@ async function closeWindow() {
 <template>
   <main class="home-shell" @click="closeContextMenu">
     <header class="titlebar" data-tauri-drag-region>
-      <h1>BVE5 Motor Assistance</h1>
+      <h1>Motor Sound Editor</h1>
       <div class="window-controls">
         <button type="button" aria-label="Minimize" @click.stop="minimizeWindow">
           <svg viewBox="0 0 12 12" aria-hidden="true">
