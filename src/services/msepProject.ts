@@ -9,7 +9,7 @@ import { sanitizeProjectDocument } from "@/utils/clone";
 const PROJECT_FILE_NAME = "project.json";
 const TRACKS_FILE_NAME = "tracks.json";
 
-export interface LoadedBmsProject {
+export interface LoadedMsepProject {
   document: ProjectDocument;
   assetPayloads: Map<ID, Uint8Array>;
 }
@@ -19,16 +19,20 @@ export function fileNameFromPath(filePath: string): string {
 }
 
 export function projectNameFromPath(filePath: string): string {
-  return fileNameFromPath(filePath).replace(/\.bms$/i, "");
+  return fileNameFromPath(filePath).replace(/\.msep$/i, "");
 }
 
-export function ensureBmsExtension(filePath: string): string {
-  return /\.bms$/i.test(filePath) ? filePath : `${filePath}.bms`;
+export function ensureMsepExtension(filePath: string): string {
+  return /\.msep$/i.test(filePath) ? filePath : `${filePath}.msep`;
+}
+
+export function isMsepPath(filePath: string): boolean {
+  return /\.msep$/i.test(filePath);
 }
 
 export async function readFileModifiedAt(filePath: string): Promise<string> {
   try {
-    const modifiedAt = await invoke<number | string>("read_bms_modified_at", {
+    const modifiedAt = await invoke<number | string>("read_msep_modified_at", {
       path: filePath,
     });
     return new Date(Number(modifiedAt)).toISOString();
@@ -84,7 +88,7 @@ export function stripRuntimeAssetFields(asset: AudioAsset): AudioAsset {
   return packagedAsset;
 }
 
-export async function packBmsProject(
+export async function packMsepProject(
   document: ProjectDocument,
   assetPayloads: Map<ID, Uint8Array>,
 ): Promise<Uint8Array> {
@@ -106,21 +110,21 @@ export async function packBmsProject(
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }
 
-export async function saveBmsProject(
+export async function saveMsepProject(
   document: ProjectDocument,
   filePath: string,
   assetPayloads: Map<ID, Uint8Array>,
 ): Promise<void> {
-  const archive = await packBmsProject(document, assetPayloads);
+  const archive = await packMsepProject(document, assetPayloads);
   const bytes = Array.from(archive);
-  await invoke("write_bms_file", {
+  await invoke("write_msep_file", {
     path: filePath,
     bytes,
   });
 }
 
-export async function openBmsProject(filePath: string): Promise<LoadedBmsProject> {
-  const archiveBytes = await invoke<number[]>("read_bms_file", {
+export async function openMsepProject(filePath: string): Promise<LoadedMsepProject> {
+  const archiveBytes = await invoke<number[]>("read_msep_file", {
     path: filePath,
   });
   const archive = new Uint8Array(archiveBytes);
@@ -129,7 +133,7 @@ export async function openBmsProject(filePath: string): Promise<LoadedBmsProject
   const tracksEntry = zip.file(TRACKS_FILE_NAME);
 
   if (!projectEntry || !tracksEntry) {
-    throw new Error("Invalid .bms file: project.json or tracks.json is missing.");
+    throw new Error("Invalid .msep file: project.json or tracks.json is missing.");
   }
 
   const project = JSON.parse(await projectEntry.async("string")) as ProjectFile;

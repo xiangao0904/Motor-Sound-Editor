@@ -22,7 +22,7 @@ logs
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
-BVE电机音编辑PRD.md
+*BVE*.md
 
 # --- Environment Variables ---
 .env

@@ -12,7 +12,7 @@ import {
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { createObjectUrl, fileNameFromPath } from "@/services/bmsProject";
+import { createObjectUrl, fileNameFromPath } from "@/services/msepProject";
 import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
@@ -40,7 +40,11 @@ import iconKeyframe from "@/assets/icons/keyframe.png";
 import iconPreviewOpen from "@/assets/icons/preview-open.png";
 import iconPreviewClose from "@/assets/icons/preview-close.png";
 
-const emit = defineEmits<{ "return-home": []; "save-project": [] }>();
+const emit = defineEmits<{
+  "return-home": [];
+  "save-project": [];
+  "export-project": [];
+}>();
 
 interface ChartConfig {
   kind: CurveKind;
@@ -98,8 +102,10 @@ const chartContextMenu = reactive<ChartContextMenuState>({
   value: 0,
 });
 const isListEditorOpen = ref(false);
+const isProjectDetailsOpen = ref(false);
 const listDraft = ref<CurveSetDraft | null>(null);
 const listEditorTrackId = ref<string | null>(null);
+const projectNameDraft = ref("");
 const listContextMenu = reactive<ListContextMenuState>({
   visible: false,
   x: 0,
@@ -206,6 +212,38 @@ const listSyncLabel = computed(() =>
     ? "Sync brake to traction"
     : "Sync traction to brake",
 );
+const projectStats = computed(() => {
+  const document = projectStore.document;
+  if (!document) return null;
+
+  const keyframeCount = document.tracks.tracks.reduce((total, track) => {
+    const curveSets = Object.values(track.curveSets);
+    return (
+      total +
+      curveSets.reduce(
+        (curveSetTotal, curveSet) =>
+          curveSetTotal +
+          curveSet.pitch.keyframes.length +
+          curveSet.volume.keyframes.length,
+        0,
+      )
+    );
+  }, 0);
+
+  return {
+    filePath: projectStore.currentFilePath ?? "Unsaved project",
+    trackCount: document.tracks.tracks.length,
+    assetCount: document.tracks.assets.length,
+    assignedAudioCount: document.tracks.tracks.filter((track) => track.assetId)
+      .length,
+    keyframeCount,
+    maxSpeed: document.project.meta.maxSpeed,
+    acceleration: document.project.meta.acceleration,
+    brakeDeceleration: document.project.meta.brakeDeceleration,
+    createdAt: document.project.meta.createdAt,
+    updatedAt: document.project.meta.updatedAt,
+  };
+});
 
 function showToast(message: string) {
   toast.value = message;
@@ -230,6 +268,19 @@ function formatTwoDecimals(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toFixed(2)
     : "";
+}
+
+function formatProjectDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}/${month}/${day} ${hours}:${minutes}`;
 }
 
 function sortedKeyframes(curve: TrackCurve): Keyframe[] {
@@ -451,6 +502,30 @@ function closeTransientMenus() {
   closeChartContextMenu();
   closeListContextMenu();
   closeAddKeyframePanel();
+}
+
+function openProjectDetails() {
+  projectNameDraft.value = meta.value?.name ?? "Untitled Project";
+  closeTransientMenus();
+  isProjectDetailsOpen.value = true;
+}
+
+function cancelProjectDetails() {
+  isProjectDetailsOpen.value = false;
+  projectNameDraft.value = "";
+}
+
+function saveProjectDetails() {
+  const currentName = meta.value?.name ?? "";
+  const nextName = projectNameDraft.value.trim() || "Untitled Project";
+
+  if (nextName !== currentName) {
+    projectStore.setProjectMeta({ name: nextName });
+    pushHistory("Update project details");
+    showToast("Project details saved");
+  }
+
+  isProjectDetailsOpen.value = false;
 }
 
 function addKeyframeAtChartPoint(
@@ -1457,7 +1532,7 @@ function deleteSelectedPoint() {
 }
 
 function exportReserved() {
-  emit("save-project");
+  emit("export-project");
 }
 
 function clearActiveSelection() {
@@ -1472,6 +1547,11 @@ function clearActiveSelection() {
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
+    if (isProjectDetailsOpen.value) {
+      cancelProjectDetails();
+      return;
+    }
+
     closeTransientMenus();
     return;
   }
@@ -1941,6 +2021,14 @@ onBeforeUnmount(() => {
       }"
       @click.stop
     >
+      <button type="button" @click="openProjectDetails">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 8h.01" />
+          <path d="M11 12h1v5h1" />
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+        Project Details
+      </button>
       <button
         type="button"
         :disabled="!activeTrack"
@@ -1960,6 +2048,83 @@ onBeforeUnmount(() => {
         </svg>
         Open list view editor
       </button>
+    </div>
+
+    <div
+      v-if="isProjectDetailsOpen && projectStats"
+      class="modal-backdrop"
+      @click.self="cancelProjectDetails"
+      @click.stop
+    >
+      <form class="project-details-dialog" @submit.prevent="saveProjectDetails">
+        <header>
+          <h2>Project Details</h2>
+          <button
+            type="button"
+            aria-label="Close project details"
+            @click="cancelProjectDetails"
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true">
+              <path d="m3 3 6 6M9 3 3 9" />
+            </svg>
+          </button>
+        </header>
+
+        <label>
+          <span>Project name</span>
+          <input v-model="projectNameDraft" type="text" />
+        </label>
+
+        <dl class="project-stats">
+          <div>
+            <dt>File path</dt>
+            <dd>{{ projectStats.filePath }}</dd>
+          </div>
+          <div>
+            <dt>Tracks</dt>
+            <dd>{{ projectStats.trackCount }}</dd>
+          </div>
+          <div>
+            <dt>Audio assets</dt>
+            <dd>{{ projectStats.assetCount }}</dd>
+          </div>
+          <div>
+            <dt>Assigned audio</dt>
+            <dd>{{ projectStats.assignedAudioCount }}</dd>
+          </div>
+          <div>
+            <dt>Keyframes</dt>
+            <dd>{{ projectStats.keyframeCount }}</dd>
+          </div>
+          <div>
+            <dt>Max speed</dt>
+            <dd>{{ projectStats.maxSpeed }} km/h</dd>
+          </div>
+          <div>
+            <dt>Acceleration</dt>
+            <dd>{{ projectStats.acceleration }} m/s^2</dd>
+          </div>
+          <div>
+            <dt>Brake deceleration</dt>
+            <dd>{{ projectStats.brakeDeceleration }} m/s^2</dd>
+          </div>
+          <div>
+            <dt>Created</dt>
+            <dd>{{ formatProjectDate(projectStats.createdAt) }}</dd>
+          </div>
+          <div>
+            <dt>Updated</dt>
+            <dd>{{ formatProjectDate(projectStats.updatedAt) }}</dd>
+          </div>
+        </dl>
+
+        <footer>
+          <button class="ghost" type="button" @click="cancelProjectDetails">
+            Cancel
+          </button>
+          <button class="primary" type="submit">Save</button>
+        </footer>
+      </form>
     </div>
 
     <div
@@ -2881,6 +3046,127 @@ onBeforeUnmount(() => {
   padding: 28px;
   background: rgba(4, 9, 12, 0.58);
   backdrop-filter: blur(6px);
+}
+
+.project-details-dialog {
+  width: min(560px, calc(100vw - 56px));
+  max-height: min(720px, calc(100vh - 78px));
+  padding: 20px;
+  overflow-y: auto;
+  background: #23313a;
+  border: 1px solid rgba(178, 213, 230, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+}
+
+.project-details-dialog header,
+.project-details-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.project-details-dialog header {
+  margin-bottom: 18px;
+}
+
+.project-details-dialog h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.project-details-dialog header button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+}
+
+.project-details-dialog header button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.project-details-dialog header svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.project-details-dialog label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: rgba(236, 246, 251, 0.78);
+  font-size: 14px;
+}
+
+.project-details-dialog input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  color: #f5fbff;
+  background: #141e23;
+  border: 1px solid rgba(178, 213, 230, 0.12);
+  border-radius: 6px;
+  outline: none;
+}
+
+.project-details-dialog input:focus {
+  border-color: rgba(139, 195, 224, 0.62);
+}
+
+.project-stats {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.project-stats div {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  min-height: 32px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.project-stats dt,
+.project-stats dd {
+  margin: 0;
+}
+
+.project-stats dt {
+  color: rgba(245, 248, 251, 0.58);
+}
+
+.project-stats dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #f5fbff;
+}
+
+.project-details-dialog footer {
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.project-details-dialog footer button {
+  height: 38px;
+  min-width: 86px;
+  padding: 0 16px;
+  color: inherit;
+  border-radius: 6px;
 }
 
 .list-editor-dialog {

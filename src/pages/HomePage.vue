@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import ExportDialog from "@/components/ExportDialog.vue";
 import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { APP_VERSION } from "@/types/project";
-import type { ProjectCardItem } from "@/types/project";
+import type { ProjectCardItem, ProjectDocument } from "@/types/project";
 import {
-  ensureBmsExtension,
-  openBmsProject,
+  ensureMsepExtension,
+  isMsepPath,
+  openMsepProject,
   readFileModifiedAt,
-  saveBmsProject,
-} from "@/services/bmsProject";
+  saveMsepProject,
+} from "@/services/msepProject";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useProjectStore } from "@/stores/project";
 import { useRecentProjectsStore } from "@/stores/recentProjects";
@@ -18,6 +20,7 @@ import { createProjectPreview } from "@/utils/projectPreview";
 
 import iconNewFile from "@/assets/icons/newfile.png";
 import iconOpenFile from "@/assets/icons/openfile.png";
+import iconImportFile from "@/assets/icons/importfile.png";
 import iconSettings from "@/assets/icons/settings.png";
 
 type SortKey = "date" | "name";
@@ -35,7 +38,11 @@ const sortKey = ref<SortKey>("date");
 const contextProjectId = ref<string | null>(null);
 const contextMenu = reactive({ visible: false, x: 0, y: 0 });
 const isCreateDialogOpen = ref(false);
+const isPreparingExport = ref(false);
+const exportDocument = ref<ProjectDocument | null>(null);
+const exportAssetPayloads = ref(new Map<string, Uint8Array>());
 const toast = ref("");
+let unlistenDragDrop: (() => void) | null = null;
 
 const newProject = reactive({
   name: "",
@@ -130,14 +137,14 @@ async function createProject() {
   const name = newProject.name.trim() || "Untitled Project";
 
   const selected = await save({
-    title: "Create BMS Project",
-    defaultPath: `${name}.bms`,
-    filters: [{ name: "BMS Project", extensions: ["bms"] }],
+    title: "Create MSEP Project",
+    defaultPath: `${name}.msep`,
+    filters: [{ name: "MSEP Project", extensions: ["msep"] }],
   });
 
   if (!selected) return;
 
-  const filePath = ensureBmsExtension(selected);
+  const filePath = ensureMsepExtension(selected);
 
   try {
     projectStore.createNewProject({
@@ -150,7 +157,7 @@ async function createProject() {
     const document = projectStore.document;
     if (!document) return;
 
-    await saveBmsProject(document, filePath, assetPayloadStore.payloads);
+    await saveMsepProject(document, filePath, assetPayloadStore.payloads);
     projectStore.markSaved(filePath);
     recentProjectsStore.upsertProject({
       name,
@@ -178,7 +185,7 @@ async function browseFile() {
   const selected = await open({
     multiple: false,
     directory: false,
-    filters: [{ name: "BMS Project", extensions: ["bms"] }],
+    filters: [{ name: "MSEP Project", extensions: ["msep"] }],
   });
 
   if (typeof selected !== "string") return;
@@ -186,8 +193,13 @@ async function browseFile() {
 }
 
 async function openProjectPath(filePath: string) {
+  if (!isMsepPath(filePath)) {
+    showToast("Only .msep projects can be opened");
+    return;
+  }
+
   try {
-    const loaded = await openBmsProject(filePath);
+    const loaded = await openMsepProject(filePath);
     projectStore.loadProject(loaded.document, filePath);
     assetPayloadStore.clear();
     loaded.assetPayloads.forEach((bytes, assetId) => {
@@ -204,6 +216,44 @@ async function openProjectPath(filePath: string) {
   } catch (error) {
     console.error("Project open failed", error);
     showToast("Project could not be opened");
+  }
+}
+
+async function importProjectPath(filePath: string): Promise<boolean> {
+  if (!isMsepPath(filePath)) {
+    showToast("Only .msep projects can be imported");
+    return false;
+  }
+
+  try {
+    const loaded = await openMsepProject(filePath);
+    recentProjectsStore.upsertProject({
+      name: loaded.document.project.meta.name,
+      filePath,
+      lastModified: await readFileModifiedAt(filePath),
+      ...createProjectPreview(loaded.document),
+    });
+    return true;
+  } catch (error) {
+    console.error("Project import failed", error);
+    showToast("Project could not be imported");
+    return false;
+  }
+}
+
+async function browseImportFile() {
+  closeContextMenu();
+
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "MSEP Project", extensions: ["msep"] }],
+  });
+
+  if (typeof selected !== "string") return;
+
+  if (await importProjectPath(selected)) {
+    showToast("Project imported");
   }
 }
 
@@ -227,8 +277,32 @@ function closeContextMenu() {
 function exportProject() {
   if (!contextProject.value) return;
 
-  showToast(`Export reserved for ${contextProject.value.name}`);
+  void openExportDialogForProject(contextProject.value);
   closeContextMenu();
+}
+
+async function openExportDialogForProject(project: ProjectCardItem) {
+  isPreparingExport.value = true;
+  try {
+    const loaded = await openMsepProject(project.filePath);
+    exportDocument.value = loaded.document;
+    exportAssetPayloads.value = loaded.assetPayloads;
+  } catch (error) {
+    console.error("Project export load failed", error);
+    showToast("Project could not be loaded for export");
+  } finally {
+    isPreparingExport.value = false;
+  }
+}
+
+function closeExportDialog() {
+  exportDocument.value = null;
+  exportAssetPayloads.value = new Map();
+}
+
+function handleExported(message: string) {
+  closeExportDialog();
+  showToast(message);
 }
 
 function deleteProject() {
@@ -251,6 +325,43 @@ async function toggleMaximizeWindow() {
 async function closeWindow() {
   await getCurrentWindow().close();
 }
+
+onMounted(async () => {
+  try {
+    unlistenDragDrop = await getCurrentWindow().onDragDropEvent(
+      async (event) => {
+        if (event.payload.type !== "drop") return;
+
+        const msepPaths = event.payload.paths.filter(isMsepPath);
+        if (msepPaths.length === 0) {
+          showToast("Only .msep projects can be imported");
+          return;
+        }
+
+        let importedCount = 0;
+        for (const path of msepPaths) {
+          if (await importProjectPath(path)) {
+            importedCount += 1;
+          }
+        }
+
+        if (importedCount > 0) {
+          showToast(
+            importedCount === 1
+              ? "Project imported"
+              : `${importedCount} projects imported`,
+          );
+        }
+      },
+    );
+  } catch {
+    // Browser-only dev previews do not expose Tauri drag-drop events.
+  }
+});
+
+onBeforeUnmount(() => {
+  unlistenDragDrop?.();
+});
 </script>
 
 <template>
@@ -290,6 +401,11 @@ async function closeWindow() {
         <button class="sidebar-action" type="button" @click.stop="browseFile">
           <img :src="iconOpenFile" class="sidebar-icon" alt="" aria-hidden="true" />
           <span>Open File</span>
+        </button>
+
+        <button class="sidebar-action" type="button" @click.stop="browseImportFile">
+          <img :src="iconImportFile" class="sidebar-icon" alt="" aria-hidden="true" />
+          <span>Import File</span>
         </button>
       </div>
 
@@ -379,7 +495,7 @@ async function closeWindow() {
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
     >
-      <button type="button" @click="exportProject">
+      <button type="button" :disabled="isPreparingExport" @click="exportProject">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 3v12" />
           <path d="m7 10 5 5 5-5" />
@@ -396,6 +512,15 @@ async function closeWindow() {
         Delete
       </button>
     </div>
+
+    <ExportDialog
+      v-if="exportDocument"
+      :document="exportDocument"
+      :asset-payloads="exportAssetPayloads"
+      @close="closeExportDialog"
+      @exported="handleExported"
+      @failed="showToast"
+    />
 
     <div
       v-if="isCreateDialogOpen"

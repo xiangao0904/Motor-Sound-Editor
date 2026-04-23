@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import ExportDialog from "@/components/ExportDialog.vue";
 import HomePage from "@/pages/HomePage.vue";
 import EditorPage from "@/pages/EditorPage.vue";
 import {
-  ensureBmsExtension,
+  ensureMsepExtension,
+  isMsepPath,
+  openMsepProject,
   readFileModifiedAt,
   restoreDocumentObjectUrls,
-  saveBmsProject,
-} from "@/services/bmsProject";
+  saveMsepProject,
+} from "@/services/msepProject";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
@@ -24,6 +29,7 @@ type PendingExitAction = "home" | "close";
 const currentView = ref<AppView>("home");
 const pendingExitAction = ref<PendingExitAction | null>(null);
 const isSavingBeforeExit = ref(false);
+const isExportDialogOpen = ref(false);
 const projectStore = useProjectStore();
 const editorStore = useEditorStore();
 const historyStore = useHistoryStore();
@@ -35,6 +41,7 @@ const hasProject = computed(() => projectStore.hasProject);
 let allowNextClose = false;
 let skipNextBeforeUnload = false;
 let unlistenCloseRequested: (() => void) | null = null;
+let unlistenMsepOpenRequested: (() => void) | null = null;
 
 function openEditor() {
   const meta = projectStore.meta;
@@ -80,16 +87,16 @@ async function persistProject(saveAs = false) {
   if (saveAs || !filePath) {
     const selected = await save({
       title: saveAs ? "Save Project As" : "Save Project",
-      defaultPath: `${document.project.meta.name}.bms`,
-      filters: [{ name: "BMS Project", extensions: ["bms"] }],
+      defaultPath: `${document.project.meta.name}.msep`,
+      filters: [{ name: "MSEP Project", extensions: ["msep"] }],
     });
 
     if (!selected) return false;
-    filePath = ensureBmsExtension(selected);
+    filePath = ensureMsepExtension(selected);
   }
 
   try {
-    await saveBmsProject(document, filePath, assetPayloadStore.payloads);
+    await saveMsepProject(document, filePath, assetPayloadStore.payloads);
     projectStore.markSaved(filePath);
     recentProjectsStore.upsertProject({
       name: document.project.meta.name,
@@ -109,6 +116,48 @@ async function persistProject(saveAs = false) {
     notificationStore.showToast("Project could not be saved");
     return false;
   }
+}
+
+async function openProjectPath(filePath: string) {
+  if (!isMsepPath(filePath)) {
+    notificationStore.showToast("Only .msep projects can be opened");
+    return;
+  }
+
+  try {
+    const loaded = await openMsepProject(filePath);
+    projectStore.loadProject(loaded.document, filePath);
+    assetPayloadStore.clear();
+    loaded.assetPayloads.forEach((bytes, assetId) => {
+      assetPayloadStore.setPayload(assetId, bytes);
+    });
+
+    recentProjectsStore.upsertProject({
+      name: loaded.document.project.meta.name,
+      filePath,
+      lastModified: await readFileModifiedAt(filePath),
+      ...createProjectPreview(loaded.document),
+    });
+    openEditor();
+  } catch (error) {
+    console.error("Project open failed", error);
+    notificationStore.showToast("Project could not be opened");
+  }
+}
+
+function openExportDialog() {
+  if (!projectStore.document) return;
+
+  isExportDialogOpen.value = true;
+}
+
+function closeExportDialog() {
+  isExportDialogOpen.value = false;
+}
+
+function handleExported(message: string) {
+  closeExportDialog();
+  notificationStore.showToast(message);
 }
 
 function applyUndo() {
@@ -250,12 +299,31 @@ onMounted(async () => {
   } catch {
     // Browser-only dev previews do not expose Tauri window events.
   }
+
+  try {
+    unlistenMsepOpenRequested = await listen<string>(
+      "msep-open-requested",
+      (event) => {
+        if (typeof event.payload === "string") {
+          void openProjectPath(event.payload);
+        }
+      },
+    );
+
+    const startupPath = await invoke<string | null>("startup_msep_path");
+    if (startupPath) {
+      void openProjectPath(startupPath);
+    }
+  } catch {
+    // Browser-only dev previews do not expose Tauri events or commands.
+  }
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleGlobalKeydown, { capture: true });
   window.removeEventListener("beforeunload", handleBeforeUnload);
   unlistenCloseRequested?.();
+  unlistenMsepOpenRequested?.();
 });
 </script>
 
@@ -266,8 +334,17 @@ onBeforeUnmount(() => {
     @return-home="requestReturnHome"
     @project-closed="requestReturnHome"
     @save-project="() => void persistProject(false)"
+    @export-project="openExportDialog"
   />
   <HomePage v-else @open-editor="openEditor" />
+  <ExportDialog
+    v-if="isExportDialogOpen && projectStore.document"
+    :document="projectStore.document"
+    :asset-payloads="assetPayloadStore.payloads"
+    @close="closeExportDialog"
+    @exported="handleExported"
+    @failed="notificationStore.showToast"
+  />
   <div
     v-if="pendingExitAction"
     class="confirm-backdrop"

@@ -5,7 +5,7 @@ import { CURVE_MAX_VALUE } from "@/constants/curveRanges";
 import {
   revokeAssetObjectUrl,
   revokeDocumentObjectUrls,
-} from "@/services/bmsProject";
+} from "@/services/msepProject";
 
 import type { ID } from "@/types/common";
 import type { CreateProjectPayload, ProjectDocument } from "@/types/project";

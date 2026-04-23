@@ -27,6 +27,20 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["msep"],
+        "name": "Motor Sound Editor Project",
+        "description": "Motor Sound Editor Project",
+        "role": "Editor",
+        "mimeType": "application/x-motor-sound-editor-project",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "com.hp.motor-sound-editor.project",
+          "conformsTo": ["public.data"]
+        }
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
