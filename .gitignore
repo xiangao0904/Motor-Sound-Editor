@@ -4,10 +4,12 @@
 /src-tauri/binaries/*
 !/src-tauri/binaries/.gitkeep
 # 忽略自动生成的图标
-/src-tauri/icons/*.ico
-/src-tauri/icons/*.png
-/src-tauri/icons/*.icns
+# /src-tauri/icons/*.ico
+# /src-tauri/icons/*.png
+# /src-tauri/icons/*.icns
 
+# /src-tauri/icons/android/*/*.png
+# /src-tauri/icons/ios/*.png
 # --- Frontend (Node/Vite/Webpack) ---
 node_modules/
 dist/

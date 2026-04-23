@@ -3126,12 +3126,14 @@ onBeforeUnmount(() => {
 
   .speed-readout label {
     width: 56px;
+    margin-left: 15px;
   }
 
   .speed-readout-input {
     flex-basis: 52px;
     font-size: 10px;
     text-align: center;
+
   }
 
   .chart-workspace {
