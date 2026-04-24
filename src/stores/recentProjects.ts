@@ -13,13 +13,34 @@ function readStoredProjects(): ProjectCardItem[] {
     const parsed = JSON.parse(raw) as ProjectCardItem[];
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter(
-      (item) =>
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.filePath === "string" &&
-        typeof item.lastModified === "string",
-    );
+    return parsed
+      .filter(
+        (item) =>
+          typeof item.id === "string" &&
+          typeof item.name === "string" &&
+          typeof item.filePath === "string" &&
+          typeof item.lastModified === "string",
+      )
+      .map((item) => ({
+        ...item,
+        previewLines: Array.isArray(item.previewLines)
+          ? item.previewLines
+              .filter(
+                (line) =>
+                  line &&
+                  typeof line.trackId === "string" &&
+                  typeof line.color === "string" &&
+                  Array.isArray(line.points),
+              )
+              .map((line) => ({
+                trackId: line.trackId,
+                color: line.color,
+                points: line.points
+                  .filter((value): value is number => typeof value === "number")
+                  .map((value) => Number(value)),
+              }))
+          : [],
+      }));
   } catch {
     return [];
   }
@@ -48,8 +69,7 @@ export const useRecentProjectsStore = defineStore("recentProjects", () => {
       filePath: project.filePath,
       lastModified: project.lastModified,
       previewImagePath: project.previewImagePath,
-      previewPitch: project.previewPitch,
-      previewVolume: project.previewVolume,
+      previewLines: project.previewLines ?? [],
     };
 
     projects.value = [

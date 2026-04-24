@@ -102,7 +102,7 @@ async function persistProject(saveAs = false) {
       name: document.project.meta.name,
       filePath,
       lastModified: await readFileModifiedAt(filePath),
-      ...createProjectPreview(document),
+        ...(await createProjectPreview(document)),
     });
     historyStore.pushSnapshot(
       "Save project",
@@ -136,7 +136,7 @@ async function openProjectPath(filePath: string) {
       name: loaded.document.project.meta.name,
       filePath,
       lastModified: await readFileModifiedAt(filePath),
-      ...createProjectPreview(loaded.document),
+        ...(await createProjectPreview(loaded.document)),
     });
     openEditor();
   } catch (error) {

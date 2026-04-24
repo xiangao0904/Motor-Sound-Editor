@@ -13,6 +13,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createObjectUrl, fileNameFromPath } from "@/services/msepProject";
+import { readAudioMetadataBatch } from "@/services/nativeInterop";
 import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
@@ -20,7 +21,7 @@ import { useHistoryStore } from "@/stores/history";
 import { useProjectStore } from "@/stores/project";
 import { useSettingsStore } from "@/stores/settings";
 import { AudioPreviewEngine } from "@/services/audioPreview";
-import { CURVE_MAX_VALUE } from "@/constants/curveRanges";
+import { CURVE_MAX_VALUE, CURVE_MIN_VALUE } from "@/constants/curveRanges";
 import { sampleCurve } from "@/utils/curves";
 import { APP_VERSION } from "@/types/project";
 import type {
@@ -129,6 +130,7 @@ const addKeyframePanel = reactive({
 const charts = new Map<CurveKind, ChartRuntime>();
 const resizeObservers: ResizeObserver[] = [];
 let animationFrame: number | null = null;
+let audioPreviewSyncFrame: number | null = null;
 let lastFrameTime = 0;
 let isPreparingKeyframeDrag = false;
 let isDraggingKeyframe = false;
@@ -290,7 +292,7 @@ function normalizeChartPoint(
 
   return {
     speed: clamp(speed, 0, editorStore.simulator.maxSpeed),
-    value: clamp(value, 0, config.maxValue),
+    value: clamp(value, CURVE_MIN_VALUE[config.kind], config.maxValue),
   };
 }
 
@@ -323,6 +325,15 @@ function syncAudioPreview() {
     activeCurveSet.value,
     editorStore.simulator.currentSpeed,
   );
+}
+
+function queueAudioPreviewSync() {
+  if (audioPreviewSyncFrame !== null) return;
+
+  audioPreviewSyncFrame = requestAnimationFrame(() => {
+    audioPreviewSyncFrame = null;
+    syncAudioPreview();
+  });
 }
 
 function chartBounds(stage: Konva.Stage) {
@@ -589,7 +600,7 @@ function addKeyframeAtChartPoint(
       keyframeId: keyframe.id,
     });
     pushHistory("Add keyframe");
-    syncAudioPreview();
+    queueAudioPreviewSync();
     renderCurveCharts();
   }
 
@@ -642,7 +653,9 @@ function normalizeDraftSpeed(value: number) {
 }
 
 function normalizeDraftValue(kind: CurveKind, value: number) {
-  return roundToTwo(clamp(value, 0, CURVE_MAX_VALUE[kind]));
+  return roundToTwo(
+    clamp(value, CURVE_MIN_VALUE[kind], CURVE_MAX_VALUE[kind]),
+  );
 }
 
 function updateListCell(
@@ -695,7 +708,7 @@ function applyListEditor() {
   listDraft.value = null;
   listEditorTrackId.value = null;
   closeTransientMenus();
-  syncAudioPreview();
+  queueAudioPreviewSync();
   renderCurveCharts();
 }
 
@@ -855,7 +868,7 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
       pointer.y,
     );
     editorStore.setCurrentSpeed(point.speed);
-    syncAudioPreview();
+    queueAudioPreviewSync();
     renderPlayheads();
     return;
   }
@@ -912,7 +925,7 @@ function handleChartContextMenu(
     );
     editorStore.clearSelection();
     pushHistory("Delete keyframe");
-    syncAudioPreview();
+    queueAudioPreviewSync();
     renderCurveCharts();
     return;
   }
@@ -1227,7 +1240,7 @@ function renderCurveChart(runtime: ChartRuntime) {
           line.points(curvePoints(stage, config, currentCurve));
         }
 
-        syncAudioPreview();
+        queueAudioPreviewSync();
         curveLayer.batchDraw();
       });
       circle.on("dragend", (event) => {
@@ -1275,7 +1288,7 @@ function renderCurveChart(runtime: ChartRuntime) {
           window.setTimeout(() => {
             suppressNextChartClick = false;
           }, 0);
-          syncAudioPreview();
+          queueAudioPreviewSync();
           setStageCursor(runtime);
           renderCurveCharts();
         }
@@ -1367,12 +1380,12 @@ function tick(timestamp: number) {
     nextSpeed = simulator.currentSpeed + simulator.acceleration * delta;
     hitLimit = nextSpeed >= simulator.maxSpeed;
   } else if (simulator.mode === "brake") {
-    nextSpeed = simulator.currentSpeed - simulator.acceleration * delta;
+    nextSpeed = simulator.currentSpeed - simulator.brakeDeceleration * delta;
     hitLimit = nextSpeed <= 0;
   }
 
   editorStore.setCurrentSpeed(nextSpeed);
-  syncAudioPreview();
+  queueAudioPreviewSync();
   if (!isDraggingKeyframe) {
     renderPlayheads();
   }
@@ -1388,7 +1401,7 @@ function tick(timestamp: number) {
 function setMode(mode: "traction" | "coasting" | "brake") {
   editorStore.setSimulatorMode(mode);
   renderCurveCharts();
-  syncAudioPreview();
+  queueAudioPreviewSync();
 }
 
 function setTool(tool: "select" | "move" | "keyframe") {
@@ -1405,7 +1418,7 @@ function setTool(tool: "select" | "move" | "keyframe") {
 function commitSpeed(value: number) {
   editorStore.setCurrentSpeed(value);
   speedDraft.value = editorStore.simulator.currentSpeed.toFixed(1);
-  syncAudioPreview();
+  queueAudioPreviewSync();
   renderPlayheads();
 }
 
@@ -1435,7 +1448,7 @@ function activateTrack(trackId: string | null) {
     editorStore.setTool("select");
   }
 
-  syncAudioPreview();
+  queueAudioPreviewSync();
   renderCurveCharts();
 }
 
@@ -1493,7 +1506,7 @@ function toggleTrackMute(trackId: string) {
 
   projectStore.updateTrack(trackId, { mute: !track.mute });
   pushHistory("Toggle mute");
-  syncAudioPreview();
+  queueAudioPreviewSync();
 }
 
 function toggleTrackVisible(trackId: string) {
@@ -1502,7 +1515,7 @@ function toggleTrackVisible(trackId: string) {
 
   projectStore.updateTrack(trackId, { visible: track.visible === false });
   pushHistory("Toggle visibility");
-  syncAudioPreview();
+  queueAudioPreviewSync();
   renderCurveCharts();
 }
 
@@ -1536,6 +1549,7 @@ async function browseAudioFile() {
     return;
   }
 
+  const [metadata] = await readAudioMetadataBatch([{ path: selected }]);
   const objectUrl = createObjectUrl(bytes, { format: extension });
   const asset = projectStore.addAsset({
     fileName,
@@ -1544,6 +1558,9 @@ async function browseAudioFile() {
     objectUrl,
     format: extension,
     size: bytes.byteLength,
+    durationSec: metadata?.durationSec,
+    sampleRate: metadata?.sampleRate,
+    channels: metadata?.channels,
   });
 
   if (asset) {
@@ -1569,7 +1586,7 @@ function updateSelectedPoint(axis: "speed" | "value", value: number) {
   );
   pushHistory("Update keyframe");
   renderCurveCharts();
-  syncAudioPreview();
+  queueAudioPreviewSync();
 }
 
 function deleteSelectedPoint() {
@@ -1584,7 +1601,7 @@ function deleteSelectedPoint() {
   );
   editorStore.clearSelection();
   pushHistory("Delete keyframe");
-  syncAudioPreview();
+  queueAudioPreviewSync();
   renderCurveCharts();
 }
 
@@ -1711,7 +1728,7 @@ watch(
 
     renderCurveCharts();
     if (editorStore.playback.transport === "playing") {
-      syncAudioPreview();
+      queueAudioPreviewSync();
     }
   },
   { deep: true },
@@ -1733,6 +1750,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopAnimationLoop();
+  if (audioPreviewSyncFrame !== null) {
+    cancelAnimationFrame(audioPreviewSyncFrame);
+    audioPreviewSyncFrame = null;
+  }
   void audioEngine.dispose();
   stopCurrentKeyframeDrag();
   charts.forEach(({ stage }) => stage.destroy());
@@ -2483,7 +2504,7 @@ onBeforeUnmount(() => {
         <span>Value</span>
         <StyledNumberInput
           v-model="addKeyframePanel.value"
-          min="0"
+          :min="CURVE_MIN_VALUE[addKeyframePanel.kind]"
           :max="CURVE_MAX_VALUE[addKeyframePanel.kind]"
           step="0.01"
           aria-label="New keyframe value"

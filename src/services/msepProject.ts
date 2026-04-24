@@ -1,13 +1,13 @@
-import JSZip from "jszip";
 import { invoke } from "@tauri-apps/api/core";
 
 import type { ID } from "@/types/common";
-import type { ProjectDocument, ProjectFile, TracksFile } from "@/types/project";
+import type { ProjectDocument } from "@/types/project";
 import type { AudioAsset } from "@/types/track";
-import { sanitizeProjectDocument } from "@/utils/clone";
-
-const PROJECT_FILE_NAME = "project.json";
-const TRACKS_FILE_NAME = "tracks.json";
+import {
+  deserializePayloadRecord,
+  openNativeMsepProject,
+  saveNativeMsepProject,
+} from "@/services/nativeInterop";
 
 export interface LoadedMsepProject {
   document: ProjectDocument;
@@ -88,69 +88,26 @@ export function stripRuntimeAssetFields(asset: AudioAsset): AudioAsset {
   return packagedAsset;
 }
 
-export async function packMsepProject(
-  document: ProjectDocument,
-  assetPayloads: Map<ID, Uint8Array>,
-): Promise<Uint8Array> {
-  const zip = new JSZip();
-  const sanitizedDocument = sanitizeProjectDocument(document);
-  const project = sanitizedDocument.project;
-  const tracks = sanitizedDocument.tracks;
-
-  zip.file(PROJECT_FILE_NAME, JSON.stringify(project, null, 2));
-  zip.file(TRACKS_FILE_NAME, JSON.stringify(tracks, null, 2));
-
-  tracks.assets.forEach((asset) => {
-    const bytes = assetPayloads.get(asset.id);
-    if (bytes) {
-      zip.file(asset.packagedPath, bytes);
-    }
-  });
-
-  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-}
-
 export async function saveMsepProject(
   document: ProjectDocument,
   filePath: string,
   assetPayloads: Map<ID, Uint8Array>,
 ): Promise<void> {
-  const archive = await packMsepProject(document, assetPayloads);
-  const bytes = Array.from(archive);
-  await invoke("write_msep_file", {
-    path: filePath,
-    bytes,
-  });
+  await saveNativeMsepProject(filePath, document, assetPayloads);
 }
 
 export async function openMsepProject(filePath: string): Promise<LoadedMsepProject> {
-  const archiveBytes = await invoke<number[]>("read_msep_file", {
-    path: filePath,
+  const loaded = await openNativeMsepProject(filePath);
+  const assetPayloads = deserializePayloadRecord(loaded.assetPayloads);
+  loaded.document.tracks.assets.forEach((asset) => {
+    const bytes = assetPayloads.get(asset.id);
+    if (bytes) {
+      asset.objectUrl = createObjectUrl(bytes, asset);
+    }
   });
-  const archive = new Uint8Array(archiveBytes);
-  const zip = await JSZip.loadAsync(archive);
-  const projectEntry = zip.file(PROJECT_FILE_NAME);
-  const tracksEntry = zip.file(TRACKS_FILE_NAME);
-
-  if (!projectEntry || !tracksEntry) {
-    throw new Error("Invalid .msep file: project.json or tracks.json is missing.");
-  }
-
-  const project = JSON.parse(await projectEntry.async("string")) as ProjectFile;
-  const tracks = JSON.parse(await tracksEntry.async("string")) as TracksFile;
-  const assetPayloads = new Map<ID, Uint8Array>();
-
-  for (const asset of tracks.assets) {
-    const entry = zip.file(asset.packagedPath);
-    if (!entry) continue;
-
-    const bytes = await entry.async("uint8array");
-    assetPayloads.set(asset.id, bytes);
-    asset.objectUrl = createObjectUrl(bytes, asset);
-  }
 
   return {
-    document: { project, tracks },
+    document: loaded.document,
     assetPayloads,
   };
 }

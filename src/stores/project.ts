@@ -1,7 +1,7 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { clamp } from "@/utils/math";
-import { CURVE_MAX_VALUE } from "@/constants/curveRanges";
+import { CURVE_MAX_VALUE, CURVE_MIN_VALUE } from "@/constants/curveRanges";
 import {
   revokeAssetObjectUrl,
   revokeDocumentObjectUrls,
@@ -26,8 +26,8 @@ function normalizeSpeed(speed: number, maxSpeed: number): number {
 }
 
 function normalizeKeyframeValue(kind: CurveKind, value: number): number {
-  const safeValue = Number.isFinite(value) ? value : 0;
-  return clamp(safeValue, 0, CURVE_MAX_VALUE[kind]);
+  const safeValue = Number.isFinite(value) ? value : CURVE_MIN_VALUE[kind];
+  return clamp(safeValue, CURVE_MIN_VALUE[kind], CURVE_MAX_VALUE[kind]);
 }
 
 function sortKeyframesBySpeed(keyframes: Keyframe[]): Keyframe[] {

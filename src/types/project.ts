@@ -39,6 +39,12 @@ export interface ProjectDocument {
   tracks: TracksFile;
 }
 
+export interface ProjectPreviewLine {
+  trackId: ID;
+  color: string;
+  points: number[];
+}
+
 /** 首页卡片数据 */
 export interface ProjectCardItem {
   id: ID;
@@ -46,8 +52,7 @@ export interface ProjectCardItem {
   filePath: string;
   lastModified: ISODateString;
   previewImagePath?: string;
-  previewPitch?: number[];
-  previewVolume?: number[];
+  previewLines?: ProjectPreviewLine[];
 }
 
 /** 新建工程参数 */

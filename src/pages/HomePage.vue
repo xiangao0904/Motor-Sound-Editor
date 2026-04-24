@@ -163,7 +163,7 @@ async function createProject() {
       name,
       filePath,
       lastModified: await readFileModifiedAt(filePath),
-      ...createProjectPreview(document),
+      ...(await createProjectPreview(document)),
     });
 
     newProject.name = "";
@@ -210,7 +210,7 @@ async function openProjectPath(filePath: string) {
       name: loaded.document.project.meta.name,
       filePath,
       lastModified: await readFileModifiedAt(filePath),
-      ...createProjectPreview(loaded.document),
+      ...(await createProjectPreview(loaded.document)),
     });
     emit("open-editor");
   } catch (error) {
@@ -231,7 +231,7 @@ async function importProjectPath(filePath: string): Promise<boolean> {
       name: loaded.document.project.meta.name,
       filePath,
       lastModified: await readFileModifiedAt(filePath),
-      ...createProjectPreview(loaded.document),
+      ...(await createProjectPreview(loaded.document)),
     });
     return true;
   } catch (error) {
@@ -464,12 +464,11 @@ onBeforeUnmount(() => {
             <div class="preview-panel" aria-hidden="true">
               <svg viewBox="0 0 100 100" preserveAspectRatio="none">
                 <polyline
-                  class="preview-line pitch"
-                  :points="linePoints(project.previewPitch ?? [])"
-                />
-                <polyline
-                  class="preview-line volume"
-                  :points="linePoints(project.previewVolume ?? [])"
+                  v-for="line in project.previewLines ?? []"
+                  :key="`${project.id}-${line.trackId}`"
+                  class="preview-line"
+                  :points="linePoints(line.points)"
+                  :style="{ stroke: line.color }"
                 />
               </svg>
             </div>
@@ -903,16 +902,9 @@ onBeforeUnmount(() => {
   fill: none;
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
-}
-
-.preview-line.pitch {
-  stroke: #5285b9;
-  filter: drop-shadow(0 0 2px rgba(82, 133, 185, 0.35));
-}
-
-.preview-line.volume {
-  stroke: #d39a75;
-  filter: drop-shadow(0 0 2px rgba(211, 154, 117, 0.28));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.22));
 }
 
 .project-card h2 {
