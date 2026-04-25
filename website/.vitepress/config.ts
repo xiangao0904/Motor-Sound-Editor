@@ -1,5 +1,8 @@
 ﻿import { defineConfig } from "vitepress";
 
+const installerUrl =
+  "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe";
+
 const englishManualSidebar = [
   { text: "Documentation Home", link: "/docs/" },
   { text: "Getting Started", link: "/docs/guide/getting-started" },
@@ -89,7 +92,7 @@ export default defineConfig({
         nav: [
           { text: "Product", link: "/" },
           { text: "Docs", link: "/docs/" },
-          { text: "Download", link: "/download/" },
+          { text: "Download", link: installerUrl },
         ],
         sidebar: {
           "/docs/": [
@@ -134,7 +137,7 @@ export default defineConfig({
         nav: [
           { text: "首页", link: "/zh/" },
           { text: "文档", link: "/zh/docs/" },
-          { text: "下载", link: "/zh/download/" },
+          { text: "下载", link: installerUrl },
         ],
         sidebar: {
           "/zh/docs/": [

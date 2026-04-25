@@ -38,3 +38,22 @@ The docs are split into two parts:
     <a href="/docs/guide/export">Open manual</a>
   </article>
 </div>
+
+## Example Files
+
+Use these sample projects to explore the editor quickly or compare your own workflow against a working `.msep` file.
+
+<div class="docs-grid">
+  <article class="docs-card">
+    <span>Example Project</span>
+    <strong>caf_train_sound.msep</strong>
+    <p>Contributor: lx9702</p>
+    <a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep">Download example</a>
+  </article>
+  <article class="docs-card">
+    <span>Example Project</span>
+    <strong>class323.msep</strong>
+    <p>Contributor: K.L1</p>
+    <a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep">Download example</a>
+  </article>
+</div>

@@ -17,8 +17,15 @@ Motor Sound Editor is built for creators who want to design layered motor sound 
 
 ### Download and install
 
-- **Get the app**: You can use the [English download page](/download/) or [GitHub Releases](https://github.com/xiangao0904/Motor-Sound-Editor/releases) to find the latest Windows installer.
+- **Get the app**: Download the current Windows installer directly from [this release link](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe).
 - **Quick install**: After downloading, run the installer. No extra runtime setup is required because the Tauri dependencies are already bundled with the app.
+
+### Example files
+
+If you want working `.msep` projects to inspect right away, start with these examples:
+
+- [caf_train_sound.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep) — Contributor: lx9702
+- [class323.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep) — Contributor: K.L1
 
 ### Data and assets
 
