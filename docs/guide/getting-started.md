@@ -24,8 +24,8 @@ Motor Sound Editor is built for creators who want to design layered motor sound 
 
 If you want working `.msep` projects to inspect right away, start with these examples:
 
-- [caf_train_sound.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep) — Contributor: lx9702
-- [class323.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep) — Contributor: K.L1
+- [caf_train_sound.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep) — Contributor: K.L1
+- [class323.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep) — Contributor: LX9702
 
 ### Data and assets
 

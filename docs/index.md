@@ -47,13 +47,13 @@ Use these sample projects to explore the editor quickly or compare your own work
   <article class="docs-card">
     <span>Example Project</span>
     <strong>caf_train_sound.msep</strong>
-    <p>Contributor: lx9702</p>
+    <p>Contributor: K.L1</p>
     <a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep">Download example</a>
   </article>
   <article class="docs-card">
     <span>Example Project</span>
     <strong>class323.msep</strong>
-    <p>Contributor: K.L1</p>
+    <p>Contributor: LX9702</p>
     <a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep">Download example</a>
   </article>
 </div>
