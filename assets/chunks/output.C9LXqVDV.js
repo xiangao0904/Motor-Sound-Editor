@@ -1,1 +1,0 @@
-const o="/Motor-Sound-Editor/docs/newproject.png",t="/Motor-Sound-Editor/docs/importaudio.png",r="/Motor-Sound-Editor/docs/trackline.png",s="/Motor-Sound-Editor/docs/rt-preview.png",d="/Motor-Sound-Editor/docs/output.png";export{o as _,t as a,r as b,s as c,d};

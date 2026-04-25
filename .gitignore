@@ -2,3 +2,24 @@
 .vitepress/dist
 node_modules
 
+# Temporary branch-publishing artifacts; GitHub Pages now deploys from Actions.
+.nojekyll
+404.html
+index.html
+vp-icons.css
+hashmap.json
+assets/
+64x64.png
+128x128.png
+logo256.png
+hero-console.svg
+homepage.png
+editpage.png
+editpage2.png
+createfile.mp4
+sculpt.mp4
+validate.mp4
+export.mp4
+docs/**/*.html
+docs/*.png
+zh/**/*.html
