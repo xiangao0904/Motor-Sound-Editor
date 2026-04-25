@@ -7,7 +7,7 @@ description: 管理轨道层、分配文件并控制轨道状态。
 
 轨道是 Motor Sound Editor 项目的基础构件。每条轨道都可以拥有自己的音频文件、颜色、名称、曲线数据与可见性状态。通过合理组织多条轨道，你可以模拟从逆变器高频啸叫到电机低频轰鸣的复杂叠加效果。
 
-<img src="/docs/trackbar.png" width="200" alt="轨道侧栏">
+![轨道侧栏](/docs/trackbar.png)
 
 ## 1. 轨道基本概念
 

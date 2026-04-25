@@ -1,5 +1,9 @@
 ﻿import { defineConfig } from "vitepress";
 
+const githubPagesBase = "/Motor-Sound-Editor/";
+const siteBase = process.env.GITHUB_ACTIONS ? githubPagesBase : "/";
+const withSiteBase = (path: string) => (path.startsWith("/") ? `${siteBase}${path.slice(1)}` : path);
+
 const installerUrl =
   "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe";
 
@@ -48,7 +52,7 @@ const chineseDevelopersSidebar = [
 ];
 
 const sharedThemeConfig = {
-  logo: "/64x64.png",
+  logo: "64x64.png",
   socialLinks: [
     {
       icon: "github",
@@ -58,12 +62,13 @@ const sharedThemeConfig = {
 };
 
 export default defineConfig({
+  base: siteBase,
   lang: "en-US",
   title: "Motor Sound Editor",
   description:
     "Official product site and user documentation for Motor Sound Editor.",
   head: [
-    ["link", { rel: "icon", href: "/64x64.png", type: "image/png" }],
+    ["link", { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" }],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     [
       "link",

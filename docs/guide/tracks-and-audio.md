@@ -7,7 +7,7 @@ description: Manage track layers, assign files, and control track state.
 
 Tracks are the basic building blocks of a Motor Sound Editor project. Each track can have its own audio file, color, name, curve data, and visibility state. By organizing several tracks well, you can build complex layered results from high-frequency inverter tones to low-frequency motor body.
 
-<img src="/docs/trackbar.png" width="200" alt="Track sidebar">
+![Track sidebar](/docs/trackbar.png)
 
 ## 1. Core track concept
 

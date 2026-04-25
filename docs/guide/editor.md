@@ -32,7 +32,7 @@ The top toolbar contains the global controls that affect how you interact with t
 
 The sidebar combines ideas from layer management and mixing so you can organize every motor-sound track in the project.
 
-<img src="/docs/trackbar.png" width="200" alt="Track sidebar">
+![Track sidebar](/docs/trackbar.png)
 
 - **Track List** shows every track in the current project. Clicking a track makes it the **active track**, and the main chart updates to show that track's curves.
 - **Asset Assignment** lets you assign or replace the local audio file used by a track.

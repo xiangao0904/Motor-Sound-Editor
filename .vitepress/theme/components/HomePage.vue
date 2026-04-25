@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { withBase } from "vitepress";
 
 import LoopingVideo from "./LoopingVideo.vue";
 import { homeContent, type HomeLocale } from "./homeContent";
@@ -18,20 +19,25 @@ const githubHref = "https://github.com/xiangao0904/Motor-Sound-Editor";
 const content = computed(() => homeContent[props.locale]);
 const isChinese = computed(() => props.locale === "zh");
 const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.value ? "" : " "));
+const logoSrc = withBase("/logo256.png");
+
+function resolveSitePath(path: string) {
+  return path.startsWith("/") ? withBase(path) : path;
+}
 </script>
 
 <template>
   <main class="mse-home" :class="{ 'mse-home--zh': isChinese }">
     <nav class="mse-nav" :aria-label="content.navAriaLabel">
       <a class="mse-brand" href="#top" :aria-label="content.homeAriaLabel">
-        <img class="mse-brand__mark" src="/logo256.png" alt="" />
+        <img class="mse-brand__mark" :src="logoSrc" alt="" />
         <span>Motor Sound Editor</span>
       </a>
       <div class="mse-nav__links" :aria-label="content.sectionLinksAriaLabel">
         <a v-for="item in content.navItems" :key="item.label" :href="item.href">{{ item.label }}</a>
       </div>
       <div class="mse-nav__actions">
-        <a class="mse-nav__lang" :href="content.languageSwitchHref" :aria-label="content.languageSwitchAriaLabel">
+        <a class="mse-nav__lang" :href="resolveSitePath(content.languageSwitchHref)" :aria-label="content.languageSwitchAriaLabel">
           {{ content.languageSwitchLabel }}
         </a>
         <a class="mse-nav__cta" :href="content.downloadHref">{{ content.downloadLabel }}</a>
@@ -40,8 +46,8 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
 
     <section id="top" class="mse-hero" aria-labelledby="hero-title">
       <div class="mse-hero__backdrop" aria-hidden="true">
-        <img class="mse-brand-glow mse-brand-glow--left" src="/logo256.png" alt="" />
-        <img class="mse-brand-glow mse-brand-glow--right" src="/logo256.png" alt="" />
+        <img class="mse-brand-glow mse-brand-glow--left" :src="logoSrc" alt="" />
+        <img class="mse-brand-glow mse-brand-glow--right" :src="logoSrc" alt="" />
         <span class="mse-rail mse-rail--one"></span>
         <span class="mse-rail mse-rail--two"></span>
       </div>
@@ -57,7 +63,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
               {{ content.hero.primaryAction }}
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
             </a>
-            <a class="mse-button mse-button--secondary" :href="content.docsHref">{{ content.hero.secondaryAction }}</a>
+            <a class="mse-button mse-button--secondary" :href="resolveSitePath(content.docsHref)">{{ content.hero.secondaryAction }}</a>
           </div>
 
           <p class="mse-version">{{ content.versionLabel }} {{ currentVersion }}</p>
@@ -75,7 +81,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
             <div class="mse-product-frame__topbar">
               <div aria-hidden="true"><span></span><span></span><span></span></div>
               <div class="mse-brand-lockup mse-brand-lockup--frame">
-                <img class="mse-brand-lockup__mark" src="/logo256.png" alt="" />
+                <img class="mse-brand-lockup__mark" :src="logoSrc" alt="" />
                 <span class="mse-brand-lockup__text">
                   <strong>Motor Sound Editor</strong>
                   <small>{{ content.brandSubline }}</small>
@@ -84,7 +90,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
               <em>{{ content.frameContext }}</em>
             </div>
             <div class="mse-media-shell mse-media-shell--hero mse-media-shell--contain">
-              <img class="mse-media" src="/editpage2.png" alt="Motor Sound Editor editor workspace preview" />
+              <img class="mse-media" :src="resolveSitePath('/editpage2.png')" alt="Motor Sound Editor editor workspace preview" />
             </div>
           </div>
 
@@ -183,7 +189,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
             </div>
             <div class="mse-media-frame">
               <div class="mse-media-shell mse-media-shell--showcase mse-media-shell--contain">
-                <img class="mse-media" :src="card.src" :alt="card.alt" loading="lazy" />
+                <img class="mse-media" :src="resolveSitePath(card.src)" :alt="card.alt" loading="lazy" />
               </div>
             </div>
           </article>
@@ -203,7 +209,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
             <div class="mse-workflow-item__visual">
               <div class="mse-media-frame mse-media-frame--workflow">
                 <div class="mse-media-shell mse-media-shell--workflow mse-media-shell--contain">
-                  <LoopingVideo class="mse-media" :src="step.src" :label="step.label" />
+                  <LoopingVideo class="mse-media" :src="resolveSitePath(step.src)" :label="step.label" />
                 </div>
               </div>
             </div>
@@ -251,10 +257,10 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
           <h2 id="docs-title">{{ content.docs.title }}</h2>
           <p>{{ content.docs.lead }}</p>
           <div style="height: 14px;"/>
-          <a class="mse-button mse-button--primary" :href="content.docsHref">{{ content.docs.action }}</a>
+          <a class="mse-button mse-button--primary" :href="resolveSitePath(content.docsHref)">{{ content.docs.action }}</a>
         </div>
         <div class="mse-docs-grid">
-          <a v-for="card in content.docs.cards" :key="card.title" class="mse-docs-card" :href="card.href">
+          <a v-for="card in content.docs.cards" :key="card.title" class="mse-docs-card" :href="resolveSitePath(card.href)">
             <span class="mse-docs-card__eyebrow">Docs</span>
             <h3>{{ card.title }}</h3>
             <p>{{ card.copy }}</p>
@@ -273,7 +279,7 @@ const heroTitle = computed(() => content.value.hero.titleLines.join(isChinese.va
         </div>
         <div class="mse-final-cta__actions">
           <a class="mse-button mse-button--primary" :href="content.downloadHref">{{ content.finalCta.primaryAction }}</a>
-          <a class="mse-button mse-button--secondary" :href="content.docsHref">{{ content.finalCta.secondaryAction }}</a>
+          <a class="mse-button mse-button--secondary" :href="resolveSitePath(content.docsHref)">{{ content.finalCta.secondaryAction }}</a>
           <a class="mse-button mse-button--secondary" :href="githubHref" target="_blank" rel="noreferrer">{{ content.githubLabel }}</a>
           <div style="text-align: center;">
             <small class="version-small">{{ content.versionLabel }} {{ currentVersion }}</small>

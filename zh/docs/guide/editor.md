@@ -32,7 +32,7 @@ description: 理解编辑器的主要区域与核心交互方式。
 
 侧栏结合了图层管理与混音思路，用于组织所有参与合成的电机音轨。
 
-<img src="/docs/trackbar.png" width="200" alt="轨道侧栏">
+![轨道侧栏](/docs/trackbar.png)
 
 - **轨道列表（Track List）**：显示当前项目中的全部轨道。点击任意轨道即可将其设为 **活动轨道（Active Track）**，主图表会同步显示该轨道的曲线。
 - **资源分配（Asset Assignment）**：你可以为每条轨道分配或替换本地音频文件。
