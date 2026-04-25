@@ -6,6 +6,8 @@
 
 **Motor Sound Editor** is a professional desktop-first editor designed specifically for BVE-style train content creation. It liberates creators from the tedious task of manually editing raw CSV tables by providing a visual, high-efficiency workflow for building, previewing, and exporting motor sound projects.
 
+![EditorPage](./website/public/editpage2.png)
+
 ---
 
 ## 🚀 Core Values
