@@ -20,7 +20,7 @@ Motor Sound Editor is a desktop editor focused on one job: building, previewing,
 | Source version | `v0.0.1` |
 | Primary target | Windows-first desktop workflow |
 | Native project format | `.msep` |
-| Current export target | `BVE` |
+| Export system | Native packaged workflow |
 | Not shipped yet | OpenBVE / MTR export, completed settings experience |
 
 ## Local development commands
@@ -48,7 +48,7 @@ pnpm site:preview
 4. Edit traction / brake pitch and volume curves.
 5. Preview the current result by changing speed and simulator mode.
 6. Save the editable project.
-7. Export a BVE-ready ZIP package when you need distributable output.
+7. Export a packaged build when you need distributable output.
 
 ## Useful shortcuts
 
@@ -65,5 +65,5 @@ pnpm site:preview
 | `Delete` | Delete the selected keyframe |
 
 ::: tip Product boundary
-The current product story should stay disciplined. The app already covers project management, curve editing, layered preview, and BVE export, but it should not be presented as if broader export ecosystems or a complete settings workflow are already done.
+The current product story should stay disciplined. The app already covers project management, curve editing, layered preview, and a shipped export workflow, but it should not be presented as if broader export ecosystems or a complete settings workflow are already done.
 :::

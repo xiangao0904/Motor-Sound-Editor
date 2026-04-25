@@ -13,7 +13,7 @@ description: Frequently asked questions about the current product state.
 - tracks and keyframes
 - packaged audio assets
 
-Its purpose is to keep a project editable, not to act like the final exported BVE distribution format.
+Its purpose is to keep a project editable, not to act like the final packaged export deliverable.
 
 ## Which audio formats are supported right now
 
@@ -24,7 +24,7 @@ The current track assignment workflow supports:
 
 ## Why do I see other export names in the UI
 
-Because the UI leaves room for future directions, but the only implemented export workflow right now is `BVE`.
+Because the UI leaves room for future directions, but the only shipped packaged output right now follows the current BVE-style structure used by the app.
 
 ## Why is there not a finished settings screen yet
 
@@ -45,12 +45,12 @@ No. It is much closer to a dedicated railway motor sound authoring tool. The foc
 - project management
 - speed-curve editing
 - realtime preview
-- BVE export
+- export-ready project authoring
 
 ## What limits should I keep in mind today
 
 - the current source version is still `v0.0.1`
 - the product story is Windows-first
-- BVE is the only current export target
+- the shipped packaged output is still narrowly scoped
 - the settings experience is incomplete
 - automated testing coverage is still limited

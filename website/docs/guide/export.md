@@ -1,11 +1,11 @@
 ---
-title: Exporting To BVE
-description: Current BVE export behavior.
+title: Export Workflow
+description: Native export workflow behavior and packaging notes.
 ---
 
-# Exporting To BVE
+# Export Workflow
 
-The current production export target is **BVE** only. Other export labels may appear in UI placeholders, but they are not part of the shipped workflow yet.
+Motor Sound Editor ships with a structured native export workflow that turns an authored project into a ready-to-test package. The current packaged output is built around the BVE-style folder and file structure used by the app today, while the authoring workflow itself is described here more broadly as the product's export pipeline.
 
 ## What makes a track exportable
 
@@ -17,10 +17,10 @@ A track is considered exportable when it is:
 
 If no track satisfies those conditions, export is intentionally blocked.
 
-## Current export capabilities
+## Current packaging behavior
 
-- export format: `BVE`
 - output container: `.zip`
+- packaged structure: current BVE-style layout
 - accepted source audio: `wav`, `ogg`
 - `ogg` is decoded and converted to `wav` during export
 - exported WAV encoding: `PCM16`
@@ -54,7 +54,7 @@ If no track satisfies those conditions, export is intentionally blocked.
 
 ### `vehicle.txt`
 
-Points BVE to `sound\Sound.txt` and `motornoise\motornoise.txt`.
+Points the packaged project to `sound\Sound.txt` and `motornoise\motornoise.txt`.
 
 ### `motornoise/*.csv`
 
@@ -70,6 +70,6 @@ Maps exported track indices to generated WAV files.
 - make sure every track you expect to hear is actually assigned to audio
 - remember that OGG inputs become WAV on export, which can change final package size
 
-::: warning Current boundary
-OpenBVE, MTR, and broader export ecosystems are still future-facing direction only. The current documentation and homepage intentionally keep the export story limited to BVE.
+::: tip Export note
+The current packaged output follows the BVE-oriented structure used by the application today. As the export system evolves, this page should remain the source of truth for the formats and package layouts that are actually shipped.
 :::

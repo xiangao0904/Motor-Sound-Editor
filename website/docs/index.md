@@ -5,7 +5,7 @@ description: Documentation hub for Motor Sound Editor.
 
 # Docs
 
-Motor Sound Editor documentation focuses on the workflow that exists today: editable `.msep` projects, layered track management, visual curve editing, realtime preview, and BVE export.
+Motor Sound Editor documentation focuses on the workflow that exists today: editable `.msep` projects, layered track management, visual curve editing, realtime preview, and a structured native export workflow.
 
 <div class="docs-grid">
   <article class="docs-card">
@@ -28,8 +28,8 @@ Motor Sound Editor documentation focuses on the workflow that exists today: edit
   </article>
   <article class="docs-card">
     <span>Export</span>
-    <strong>BVE export behavior</strong>
-    <p>Review export eligibility, file structure, supported rates, and what the current BVE ZIP package contains.</p>
+    <strong>Export workflow behavior</strong>
+    <p>Review export eligibility, file structure, supported rates, and what the current packaged output contains.</p>
     <a href="/docs/guide/export">Open export guide</a>
   </article>
 </div>
@@ -38,7 +38,7 @@ Motor Sound Editor documentation focuses on the workflow that exists today: edit
 
 - Current shipped workflows only
 - User-facing editor behavior and product boundaries
-- BVE export, not future export targets
+- Native export workflow as shipped today
 - English-first authored documentation
 
 ## Suggested reading order
@@ -46,5 +46,5 @@ Motor Sound Editor documentation focuses on the workflow that exists today: edit
 1. [Quick Start](/docs/guide/getting-started)
 2. [Home & Projects](/docs/guide/home)
 3. [Editor & Track Layers](/docs/guide/editor)
-4. [Exporting To BVE](/docs/guide/export)
+4. [Export Workflow](/docs/guide/export)
 5. [FAQ](/docs/guide/faq)

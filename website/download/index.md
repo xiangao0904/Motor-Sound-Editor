@@ -25,7 +25,7 @@ description: Download placeholder for Motor Sound Editor.
       </li>
       <li>
         <strong>Recommended next step</strong>
-        <p>Use the docs to understand project creation, curve editing, preview behavior, and the current BVE export path.</p>
+        <p>Use the docs to understand project creation, curve editing, preview behavior, and the current native export workflow.</p>
       </li>
     </ul>
   </section>

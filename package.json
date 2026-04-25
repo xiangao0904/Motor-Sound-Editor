@@ -1,7 +1,7 @@
 {
   "name": "motor-sound-editor",
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "site:dev": "pnpm --dir website dev",
     "site:build": "pnpm --dir website build",
-    "site:preview": "pnpm --dir website preview"
+    "site:preview": "pnpm --dir website preview",
+    "site:typecheck": "pnpm --dir website typecheck"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

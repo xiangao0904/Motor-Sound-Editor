@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Cursor, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
@@ -323,6 +323,7 @@ fn create_msep_archive(
     document: &ProjectDocument,
     asset_payloads: &HashMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>, String> {
+    let compact_document = compact_project_document(document, asset_payloads);
     let cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(cursor);
     let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
@@ -330,16 +331,16 @@ fn create_msep_archive(
     zip.start_file(PROJECT_FILE_NAME, options)
         .map_err(|error| error.to_string())?;
     zip.write_all(
-        &serde_json::to_vec_pretty(&document.project).map_err(|error| error.to_string())?,
+        &serde_json::to_vec_pretty(&compact_document.project).map_err(|error| error.to_string())?,
     )
     .map_err(|error| error.to_string())?;
 
     zip.start_file(TRACKS_FILE_NAME, options)
         .map_err(|error| error.to_string())?;
-    zip.write_all(&serde_json::to_vec_pretty(&document.tracks).map_err(|error| error.to_string())?)
+    zip.write_all(&serde_json::to_vec_pretty(&compact_document.tracks).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
 
-    for asset in &document.tracks.assets {
+    for asset in &compact_document.tracks.assets {
         if let Some(bytes) = asset_payloads.get(&asset.id) {
             zip.start_file(&asset.packaged_path, options)
                 .map_err(|error| error.to_string())?;
@@ -350,6 +351,40 @@ fn create_msep_archive(
     zip.finish()
         .map(|cursor| cursor.into_inner())
         .map_err(|error| error.to_string())
+}
+
+fn compact_project_document(
+    document: &ProjectDocument,
+    asset_payloads: &HashMap<String, Vec<u8>>,
+) -> ProjectDocument {
+    let mut compact_document = document.clone();
+    let referenced_asset_ids = compact_document
+        .tracks
+        .tracks
+        .iter()
+        .filter_map(|track| track.asset_id.clone())
+        .collect::<HashSet<_>>();
+
+    compact_document.tracks.assets.retain(|asset| {
+        referenced_asset_ids.contains(&asset.id) && asset_payloads.contains_key(&asset.id)
+    });
+
+    let valid_asset_ids = compact_document
+        .tracks
+        .assets
+        .iter()
+        .map(|asset| asset.id.clone())
+        .collect::<HashSet<_>>();
+
+    for track in &mut compact_document.tracks.tracks {
+        if let Some(asset_id) = &track.asset_id {
+            if !valid_asset_ids.contains(asset_id) {
+                track.asset_id = None;
+            }
+        }
+    }
+
+    compact_document
 }
 
 fn decode_audio_source(

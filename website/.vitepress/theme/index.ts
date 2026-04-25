@@ -5,11 +5,13 @@ import LocaleReserveNotice from "./components/LocaleReserveNotice.vue";
 import ScreenshotPlaceholder from "./components/ScreenshotPlaceholder.vue";
 import "./style.css";
 
-export default {
+const theme = {
   extends: DefaultTheme,
   Layout,
   enhanceApp({ app }) {
     app.component("LocaleReserveNotice", LocaleReserveNotice);
     app.component("ScreenshotPlaceholder", ScreenshotPlaceholder);
   },
-} satisfies Theme;
+} as Theme;
+
+export default theme;

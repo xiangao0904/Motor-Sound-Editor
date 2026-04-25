@@ -25,7 +25,7 @@ const rootSidebar = [
     items: [
       { text: "Home & Projects", link: "/docs/guide/home" },
       { text: "Editor & Track Layers", link: "/docs/guide/editor" },
-      { text: "Exporting To BVE", link: "/docs/guide/export" },
+      { text: "Export Workflow", link: "/docs/guide/export" },
       { text: "FAQ", link: "/docs/guide/faq" },
     ],
   },
@@ -67,7 +67,7 @@ export default defineConfig({
       {
         property: "og:description",
         content:
-          "Build editable .msep projects, shape pitch and volume curves, preview layered motor sound in real time, and export BVE-ready packages.",
+          "Build editable .msep projects, shape pitch and volume curves, preview layered motor sound in real time, and package projects through a clean native export workflow.",
       },
     ],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
@@ -99,7 +99,7 @@ export default defineConfig({
       lang: "en-US",
       title: "Motor Sound Editor",
       description:
-        "Desktop railway motor sound editing, preview, and BVE export workflows.",
+        "Desktop railway motor sound editing, preview, and native export workflows.",
       themeConfig: {
         nav: rootNav,
         sidebar: {

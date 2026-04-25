@@ -1,9 +1,18 @@
 <script setup lang="ts">
+import LoopingVideo from "./LoopingVideo.vue";
+
 const currentVersion = "v1.0.0";
 const downloadHref = "https://github.com/xiangao0904/Motor-Sound-Editor/releases";
 const githubHref = "https://github.com/xiangao0904/Motor-Sound-Editor";
+const docsHref = "/docs/";
 
-const navItems = ["Why", "Features", "Workflow", "Format"];
+const navItems = [
+  { label: "Why", href: "#why" },
+  { label: "Features", href: "#features" },
+  { label: "Showcase", href: "#showcase" },
+  { label: "Workflow", href: "#workflow" },
+  { label: "Docs", href: "#docs" },
+];
 
 const comparisonCards = [
   {
@@ -16,9 +25,9 @@ const comparisonCards = [
   {
     eyebrow: "Motor Sound Editor",
     title: "Curves, tracks and preview live in one focused workspace.",
-    copy: "Shape speed-based pitch and volume visually, switch train states instantly, and hear the result before packaging the project for your target simulator.",
+    copy: "Shape speed-based pitch and volume visually, switch train states instantly, and hear the result before packaging the project through one clean native export workflow.",
     tone: "modern",
-    bullets: ["Visual curve authoring", "Traction / coast / brake preview", "Project-first export pipeline"],
+    bullets: ["Visual curve authoring", "Traction / coast / brake preview", "Native export workflow"],
   },
 ];
 
@@ -40,62 +49,119 @@ const features = [
   },
   {
     icon: "M12 3v12m0 0 5-5m-5 5-5-5M4 20h16M6 6h4M14 6h4",
-    title: "One-click export",
-    copy: "Prepare audio conversion and target-specific directory structures for BVE, OpenBVE and MTR delivery packages.",
+    title: "Structured export pipeline",
+    copy: "Package projects through a clean native export workflow so handoff, validation and release builds stay organized.",
+  },
+];
+
+const showcaseCards = [
+  {
+    label: "Project gallery",
+    title: "Home gallery and project management",
+    copy: "Browse recent projects, search quickly, sort your work, and jump into a saved sound set without rebuilding context.",
+    src: "/homepage.png",
+    alt: "Motor Sound Editor home gallery and project management view",
+    fit: "contain",
+  },
+  {
+    label: "Editor workspace",
+    title: "Curve editing, transport and layered track control",
+    copy: "Tune pitch and volume curves against speed, move across train states, and manage track layers inside one dedicated workspace.",
+    src: "/editpage.png",
+    alt: "Motor Sound Editor editor workspace with curve panels and track layers",
+    fit: "contain",
   },
 ];
 
 const workflowSteps = [
   {
     number: "01",
-    title: "Create a project",
-    copy: "Import source material, define maximum speed, acceleration and deceleration parameters, then keep every asset inside a single project context.",
+    title: "Create or reopen a project",
+    copy: "Start from a clean project, reopen an existing .msep workspace, and keep source material inside one organized production context.",
+    src: "/createfile.mp4",
   },
   {
     number: "02",
-    title: "Sculpt the curves",
-    copy: "Treat motor sound like a visual medium. Add keyframes, reshape transitions and tune how pitch and volume react to speed.",
+    title: "Sculpt behavior curves",
+    copy: "Treat motor sound like a visual system. Add keyframes, reshape transitions, and tune how pitch and volume respond to speed.",
+    src: "/sculpt.mp4",
   },
   {
     number: "03",
-    title: "Validate instantly",
-    copy: "Use keyboard controls such as Space and W / S to simulate train behavior and check the sound under traction, coast and braking.",
+    title: "Validate while tuning",
+    copy: "Preview traction, coasting and braking behavior immediately so each adjustment can be judged in motion instead of waiting for the final package.",
+    src: "/validate.mp4",
   },
   {
     number: "04",
-    title: "Ship the package",
-    copy: "Export a ZIP package with the expected structure so the result can move directly into a BVE environment or be shared with collaborators.",
+    title: "Package for delivery",
+    copy: "Build an export-ready package with project structure and bundled assets prepared for testing, release work and sharing.",
+    src: "/export.mp4",
   },
 ];
 
-const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
+const docsCards = [
+  {
+    title: "Quick Start",
+    copy: "Install the app, open your first project, and understand the fastest route from source audio to a working package.",
+    href: "/docs/guide/getting-started",
+  },
+  {
+    title: "Editor Workflow",
+    copy: "Learn how track layers, state previews, curve panels and keyframe editing work together inside the main editor.",
+    href: "/docs/guide/editor",
+  },
+  {
+    title: "Export Reference",
+    copy: "Review the native export workflow, packaging expectations, and the practical checks to make before a release build.",
+    href: "/docs/guide/export",
+  },
+];
+
+const foundationItems = [
+  {
+    title: "Visual curve authoring",
+    copy: "Edit pitch and volume behavior directly in a visual workspace instead of maintaining raw table files by hand.",
+  },
+  {
+    title: "Portable project container",
+    copy: "Keep project data, track layers, curve data and bundled audio together inside one transportable .msep file.",
+  },
+  {
+    title: "Native desktop workflow",
+    copy: "Run a fast Rust + Tauri toolchain with layered preview, responsive editing and export-ready project packaging.",
+  },
+];
 </script>
 
 <template>
   <main class="mse-home">
     <nav class="mse-nav" aria-label="Primary navigation">
       <a class="mse-brand" href="#top" aria-label="Motor Sound Editor home">
-        <span class="mse-brand__mark" aria-hidden="true"></span>
+        <img class="mse-brand__mark" src="/logo256.png" alt="">
         <span>Motor Sound Editor</span>
       </a>
       <div class="mse-nav__links" aria-label="Page sections">
-        <a v-for="item in navItems" :key="item" :href="`#${item.toLowerCase()}`">{{ item }}</a>
+        <a v-for="item in navItems" :key="item.label" :href="item.href">{{ item.label }}</a>
       </div>
       <a class="mse-nav__cta" :href="downloadHref" target="_blank" rel="noreferrer">Download</a>
     </nav>
 
     <section id="top" class="mse-hero" aria-labelledby="hero-title">
       <div class="mse-hero__backdrop" aria-hidden="true">
-        <span class="mse-orb mse-orb--cyan"></span>
-        <span class="mse-orb mse-orb--violet"></span>
+        <img class="mse-brand-glow mse-brand-glow--left" src="/logo256.png" alt="">
+        <img class="mse-brand-glow mse-brand-glow--right" src="/logo256.png" alt="">
         <span class="mse-rail mse-rail--one"></span>
         <span class="mse-rail mse-rail--two"></span>
       </div>
 
       <div class="mse-shell mse-hero__layout">
         <div class="mse-hero__copy">
-          <p class="mse-kicker">BVE motor sound authoring · Visual desktop workflow</p>
-          <h1 id="hero-title">Design BVE motor sound with surgical control.</h1>
+          <p class="mse-kicker">BVE motor sound authoring - visual desktop workflow</p>
+          <h1 id="hero-title">
+            Design BVE motor sound
+            <span>with surgical control.</span>
+          </h1>
           <p class="mse-hero__lead">
             Leave manual CSV editing behind. Motor Sound Editor turns pitch, volume, speed and train-state behavior into a refined visual workflow with real-time feedback.
           </p>
@@ -105,16 +171,14 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
               Download for Windows
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
             </a>
-            <a class="mse-button mse-button--secondary" :href="githubHref" target="_blank" rel="noreferrer">
-              View GitHub
-            </a>
+            <a class="mse-button mse-button--secondary" :href="docsHref">Open Docs</a>
           </div>
           <p class="mse-version">Current release {{ currentVersion }}</p>
 
           <dl class="mse-hero__stats" aria-label="Product highlights">
             <div>
               <dt>3</dt>
-              <dd>simulator targets</dd>
+              <dd>drive states with real-time preview</dd>
             </div>
             <div>
               <dt>.msep</dt>
@@ -127,18 +191,21 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
           </dl>
         </div>
 
-        <div class="mse-hero__showcase" aria-label="Software interface screenshot placeholder">
+        <div class="mse-hero__showcase" aria-label="Software interface preview">
           <div class="mse-product-frame">
             <div class="mse-product-frame__topbar">
               <div aria-hidden="true"><span></span><span></span><span></span></div>
-              <strong>Motor Sound Editor</strong>
+              <div class="mse-brand-lockup mse-brand-lockup--frame">
+                <img class="mse-brand-lockup__mark" src="/logo256.png" alt="">
+                <span class="mse-brand-lockup__text">
+                  <strong>Motor Sound Editor</strong>
+                  <small>Desktop authoring suite</small>
+                </span>
+              </div>
               <em>Curve workspace</em>
             </div>
-            <div class="mse-placeholder mse-placeholder--hero">
-              <div>
-                <strong>Software screenshot placeholder</strong>
-                <span>Dark mode · pitch and volume curve editing</span>
-              </div>
+            <div class="mse-media-shell mse-media-shell--hero mse-media-shell--contain">
+              <img class="mse-media" src="/editpage2.png" alt="Motor Sound Editor editor workspace preview" />
             </div>
           </div>
 
@@ -178,10 +245,10 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
             <p>{{ card.copy }}</p>
 
             <div v-if="card.tone === 'legacy'" class="mse-csv-panel" aria-label="CSV editing mockup">
-              <code>0, 0.82, motor_loop_01.wav</code>
-              <code>25, 1.12, motor_loop_02.wav</code>
-              <code>48, 1.37, motor_loop_03.wav</code>
-              <code>72, 1.64, motor_loop_04.wav</code>
+              <code>0.2,1,0.7,,,,,,,,,,,,,,,,,,,0.2</code>
+              <code>2,1,0.7,0.5,0.5,,,,,,,,,,,,,,,,,</code>
+              <code>10,1.6,1.3,1,1,1,,,,,,,,,,,,,,,,</code>
+              <code>20,1.6,1.3,,,,1.2,,,,,,,,,,,,,,,</code>
             </div>
             <div v-else class="mse-curve-panel" aria-label="Curve editing mockup">
               <svg viewBox="0 0 360 180" role="img">
@@ -231,6 +298,33 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
       </div>
     </section>
 
+    <section id="showcase" class="mse-section mse-section--showcase" aria-labelledby="showcase-title">
+      <div class="mse-shell">
+        <div class="mse-section__intro mse-section__intro--center">
+          <p class="mse-kicker">Product showcase</p>
+          <h2 id="showcase-title">The product surface stays as polished as the sound work inside it.</h2>
+          <p>
+            Manage projects on the home screen, then move into a full editor designed around curve visibility, track layering and state-based playback.
+          </p>
+        </div>
+
+        <div class="mse-showcase-grid">
+          <article v-for="card in showcaseCards" :key="card.title" class="mse-showcase-card">
+            <div class="mse-showcase-card__header">
+              <span class="mse-card-label">{{ card.label }}</span>
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.copy }}</p>
+            </div>
+            <div class="mse-media-frame">
+              <div class="mse-media-shell mse-media-shell--showcase mse-media-shell--contain">
+                <img class="mse-media" :src="card.src" :alt="card.alt" loading="lazy" />
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section id="workflow" class="mse-section mse-section--workflow" aria-labelledby="workflow-title">
       <div class="mse-shell">
         <div class="mse-section__intro mse-section__intro--center">
@@ -249,10 +343,9 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
             :class="{ 'mse-workflow-item--reverse': index % 2 === 1 }"
           >
             <div class="mse-workflow-item__visual">
-              <div class="mse-placeholder mse-placeholder--workflow">
-                <div>
-                  <strong>Workflow image placeholder</strong>
-                  <span>{{ step.title }}</span>
+              <div class="mse-media-frame mse-media-frame--workflow">
+                <div class="mse-media-shell mse-media-shell--workflow mse-media-shell--contain">
+                  <LoopingVideo class="mse-media" :src="step.src" :label="`${step.title} workflow preview`" />
                 </div>
               </div>
             </div>
@@ -272,10 +365,13 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
           <p class="mse-kicker">Tech stack & format</p>
           <h2 id="tech-title">A native foundation for serious project work.</h2>
           <p>
-            Motor Sound Editor combines a lightweight Rust + Tauri desktop shell with a portable project format designed for versioning, migration and collaboration.
+            Motor Sound Editor pairs a responsive Rust + Tauri desktop shell with a project format built for editing continuity, bundled media and clean native export packaging.
           </p>
-          <div class="mse-tech-pills" aria-label="Technology and export targets">
-            <span v-for="item in techItems" :key="item">{{ item }}</span>
+          <div class="mse-tech-proof-grid" aria-label="Foundation capabilities">
+            <article v-for="item in foundationItems" :key="item.title" class="mse-tech-proof-card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.copy }}</p>
+            </article>
           </div>
         </div>
 
@@ -284,18 +380,40 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
             <span>.msep</span>
             <strong>Project container</strong>
           </div>
-          <h3>Keep metadata, curves, tracks and audio assets together.</h3>
+          <h3>Keep project data, curve data, track layers and bundled audio together.</h3>
           <p>
-            The dedicated .msep format packages project metadata and audio assets so a sound set can be saved, transferred, archived or shared without relying on loose folder memory.
+            The dedicated .msep format packages project data and bundled audio so a sound set can be saved, transferred, archived or shared without relying on loose folders or manual file memory.
           </p>
           <div class="mse-format-card__map" aria-hidden="true">
-            <span>metadata</span>
-            <span>curves</span>
-            <span>tracks</span>
-            <span>audio assets</span>
-            <span>export targets</span>
+            <span>project data</span>
+            <span>curve data</span>
+            <span>track layers</span>
+            <span>bundled audio</span>
+            <span>export output</span>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section id="docs" class="mse-section mse-section--docs" aria-labelledby="docs-title">
+      <div class="mse-shell mse-docs-spotlight">
+        <div class="mse-docs-spotlight__intro">
+          <p class="mse-kicker">Learn the workflow</p>
+          <h2 id="docs-title">Documentation is part of the product, not an afterthought.</h2>
+          <p>
+            Jump into the docs hub for setup guidance, project management, editor behavior, export workflow notes and answers to the questions that come up during real production work.
+          </p>
+          <a class="mse-button mse-button--primary" :href="docsHref">Open Docs</a>
+        </div>
+
+        <div class="mse-docs-grid">
+          <a v-for="card in docsCards" :key="card.title" class="mse-docs-card" :href="card.href">
+            <span class="mse-docs-card__eyebrow">Docs</span>
+            <h3>{{ card.title }}</h3>
+            <p>{{ card.copy }}</p>
+            <strong>Read guide</strong>
+          </a>
+        </div>
       </div>
     </section>
 
@@ -304,10 +422,11 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
         <div>
           <p class="mse-kicker">Start building</p>
           <h2 id="final-cta-title">Bring a modern authoring workflow to your next BVE motor sound project.</h2>
-          <p>Download the Windows release or visit the GitHub repository to follow development, report issues and review the source.</p>
+          <p>Download the Windows release, open the docs, or visit the GitHub repository to follow development and review the source.</p>
         </div>
         <div class="mse-final-cta__actions">
           <a class="mse-button mse-button--primary" :href="downloadHref" target="_blank" rel="noreferrer">Download for Windows</a>
+          <a class="mse-button mse-button--secondary" :href="docsHref">Open Docs</a>
           <a class="mse-button mse-button--secondary" :href="githubHref" target="_blank" rel="noreferrer">GitHub Repository</a>
           <small>Current release {{ currentVersion }}</small>
         </div>
@@ -319,28 +438,18 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
 <style scoped>
 .mse-home {
   --mse-bg: #050711;
-  --mse-bg-2: #090d18;
-  --mse-surface: rgba(255, 255, 255, 0.07);
-  --mse-surface-strong: rgba(255, 255, 255, 0.11);
   --mse-border: rgba(255, 255, 255, 0.14);
-  --mse-border-strong: rgba(255, 255, 255, 0.23);
   --mse-text: #f7f8ff;
   --mse-muted: rgba(231, 236, 255, 0.72);
   --mse-dim: rgba(231, 236, 255, 0.5);
   --mse-accent: #8bdcff;
-  --mse-accent-2: #bba7ff;
-  --mse-gold: #f5d7a1;
-  --mse-placeholder: #e11d2e;
   --mse-radius-xl: 34px;
   --mse-radius-lg: 26px;
-  --mse-radius-md: 18px;
   position: relative;
   overflow: clip;
   min-height: 100vh;
   color: var(--mse-text);
   background:
-    radial-gradient(circle at 10% 0%, rgba(139, 220, 255, 0.16), transparent 33rem),
-    radial-gradient(circle at 88% 16%, rgba(187, 167, 255, 0.16), transparent 36rem),
     linear-gradient(180deg, var(--mse-bg), #070a14 44%, var(--mse-bg));
   font-family:
     Inter,
@@ -395,7 +504,6 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
 .mse-brand {
   gap: 10px;
   min-width: max-content;
-  color: var(--mse-text);
   font-size: 14px;
   font-weight: 850;
   letter-spacing: -0.01em;
@@ -405,12 +513,7 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
 .mse-brand__mark {
   width: 30px;
   height: 30px;
-  border: 1px solid rgba(139, 220, 255, 0.45);
-  border-radius: 11px;
-  background:
-    linear-gradient(135deg, rgba(139, 220, 255, 0.96), rgba(187, 167, 255, 0.92)),
-    #101827;
-  box-shadow: 0 0 30px rgba(139, 220, 255, 0.35);
+  object-fit: contain;
 }
 
 .mse-nav__links {
@@ -430,8 +533,15 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
   color: var(--mse-text);
 }
 
-.mse-nav__cta {
+.mse-nav__cta,
+.mse-button {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  text-decoration: none;
+}
+
+.mse-nav__cta {
   min-height: 42px;
   padding: 0 18px;
   border-radius: 999px;
@@ -439,7 +549,6 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
   background: #f7f8ff;
   font-size: 13px;
   font-weight: 850;
-  text-decoration: none;
 }
 
 .mse-hero {
@@ -469,32 +578,30 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
   overflow: hidden;
 }
 
-.mse-orb,
+.mse-brand-glow,
 .mse-rail {
   position: absolute;
   display: block;
 }
 
-.mse-orb {
-  border-radius: 999px;
-  filter: blur(18px);
-  opacity: 0.58;
+.mse-brand-glow {
+  opacity: 0.2;
+  filter: blur(74px);
+  transform: scale(1.85);
+  transform-origin: center;
+  user-select: none;
 }
 
-.mse-orb--cyan {
-  top: 12%;
-  left: -120px;
-  width: 280px;
-  height: 280px;
-  background: rgba(139, 220, 255, 0.2);
+.mse-brand-glow--left {
+  top: 9%;
+  left: -72px;
+  width: 220px;
 }
 
-.mse-orb--violet {
-  top: 7%;
-  right: -130px;
-  width: 360px;
-  height: 360px;
-  background: rgba(187, 167, 255, 0.18);
+.mse-brand-glow--right {
+  top: 8%;
+  right: -84px;
+  width: 250px;
 }
 
 .mse-rail {
@@ -517,31 +624,33 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
 
 .mse-hero__layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(450px, 1.08fr);
+  grid-template-columns: minmax(0, 0.78fr) minmax(560px, 1.22fr);
   align-items: center;
-  gap: clamp(42px, 7vw, 92px);
+  gap: clamp(26px, 4.8vw, 64px);
 }
 
 .mse-hero__copy {
-  max-width: 720px;
+  display: grid;
+  align-content: start;
+  max-width: 620px;
 }
 
 .mse-kicker {
   display: inline-flex;
   align-items: center;
   gap: 11px;
-  margin: 0 0 20px;
+  max-width: 540px;
+  margin: 0 0 18px;
   color: var(--mse-accent);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
-  letter-spacing: 0.18em;
-  line-height: 1.4;
+  letter-spacing: 0.16em;
+  line-height: 1.5;
   text-transform: uppercase;
 }
 
 .mse-kicker::before {
   content: "";
-  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-radius: 999px;
@@ -553,24 +662,30 @@ const techItems = ["Rust", "Tauri", ".msep", "BVE", "OpenBVE", "MTR"];
 .mse-section h2,
 .mse-final-cta h2 {
   margin: 0;
-  color: var(--mse-text);
   font-weight: 950;
   letter-spacing: -0.068em;
   line-height: 0.95;
 }
 
 .mse-hero h1 {
-  max-width: 760px;
-  line-height: 1.1;
-font-size: clamp(24px, 4.5vw, 60px);
+  max-width: 12ch;
+  line-height: 1.02;
+  font-size: clamp(42px, 4.3vw, 70px);
+  text-wrap: balance;
+}
+
+.mse-hero h1 span {
+  display: block;
+  color: rgba(247, 248, 255, 0.92);
+  text-shadow: 0 8px 30px rgba(139, 220, 255, 0.18);
 }
 
 .mse-hero__lead {
-  margin: 28px 0 0;
-  max-width: 660px;
-  color: var(--mse-muted);
-  font-size: clamp(18px, 2vw, 22px);
-  line-height: 1.72;
+  margin: 24px 0 0;
+  max-width: 34ch;
+  color: rgba(231, 236, 255, 0.84);
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.64;
 }
 
 .mse-hero__actions,
@@ -581,20 +696,16 @@ font-size: clamp(24px, 4.5vw, 60px);
 }
 
 .mse-hero__actions {
-  margin-top: 38px;
+  margin-top: 30px;
 }
 
 .mse-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   gap: 10px;
   min-height: 54px;
   padding: 0 24px;
   border: 1px solid transparent;
   border-radius: 999px;
   font-weight: 900;
-  text-decoration: none;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -623,7 +734,6 @@ font-size: clamp(24px, 4.5vw, 60px);
 }
 
 .mse-button--secondary {
-  color: var(--mse-text);
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.075);
   backdrop-filter: blur(18px);
@@ -634,41 +744,43 @@ font-size: clamp(24px, 4.5vw, 60px);
   background: rgba(255, 255, 255, 0.12);
 }
 
+.mse-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 30px 0 0;
+}
+
+.mse-hero__stats div {
+  min-height: 94px;
+  padding: 14px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(14px);
+}
+
+.mse-hero__stats dd,
 .mse-version {
-  margin: 14px 0 0 4px;
   color: var(--mse-dim);
   font-size: 13px;
 }
 
-.mse-hero__stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin: 48px 0 0;
-}
-
-.mse-hero__stats div {
-  min-height: 112px;
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.055);
-  backdrop-filter: blur(18px);
-}
-
 .mse-hero__stats dt {
   margin: 0;
-  color: var(--mse-text);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 950;
   letter-spacing: -0.05em;
 }
 
 .mse-hero__stats dd {
-  margin: 9px 0 0;
-  color: var(--mse-dim);
-  font-size: 13px;
-  line-height: 1.45;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+.mse-version {
+  margin: 12px 0 0 2px;
+  letter-spacing: 0.02em;
 }
 
 .mse-hero__showcase {
@@ -677,7 +789,13 @@ font-size: clamp(24px, 4.5vw, 60px);
   perspective: 1200px;
 }
 
-.mse-product-frame {
+.mse-hero__showcase .mse-product-frame {
+  width: min(100%, 1220px);
+  margin-left: auto;
+}
+
+.mse-product-frame,
+.mse-media-frame {
   position: relative;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -689,10 +807,14 @@ font-size: clamp(24px, 4.5vw, 60px);
     0 42px 120px rgba(0, 0, 0, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(26px);
+}
+
+.mse-product-frame {
   transform: rotateX(2deg) rotateY(-5deg);
 }
 
-.mse-product-frame::before {
+.mse-product-frame::before,
+.mse-media-frame::before {
   content: "";
   position: absolute;
   inset: 34px -26px -22px 28px;
@@ -713,21 +835,16 @@ font-size: clamp(24px, 4.5vw, 60px);
   font-size: 12px;
 }
 
-.mse-product-frame__topbar div {
+.mse-product-frame__topbar > div:first-child {
   display: flex;
   gap: 8px;
 }
 
-.mse-product-frame__topbar span {
+.mse-product-frame__topbar > div:first-child span {
   width: 10px;
   height: 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.35);
-}
-
-.mse-product-frame__topbar strong {
-  color: rgba(247, 248, 255, 0.78);
-  font-weight: 850;
 }
 
 .mse-product-frame__topbar em {
@@ -735,47 +852,71 @@ font-size: clamp(24px, 4.5vw, 60px);
   font-style: normal;
 }
 
-.mse-placeholder {
+.mse-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mse-brand-lockup__mark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.mse-brand-lockup__text {
   display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  border-radius: 26px;
-  color: #fff;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 34%),
-    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.22), transparent 20%),
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 22px),
-    var(--mse-placeholder);
-  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.22);
+  min-width: 0;
+  gap: 1px;
 }
 
-.mse-placeholder--hero {
-  min-height: clamp(360px, 43vw, 560px);
+.mse-brand-lockup__text strong {
+  color: rgba(247, 248, 255, 0.82);
+  font-size: 13px;
+  font-weight: 820;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-.mse-placeholder--workflow {
-  min-height: 286px;
-  aspect-ratio: 16 / 10;
-}
-
-.mse-placeholder div {
-  display: grid;
-  gap: 9px;
-  padding: 24px;
-  text-align: center;
-}
-
-.mse-placeholder strong {
-  font-size: clamp(23px, 3vw, 36px);
-  font-weight: 950;
-  letter-spacing: -0.045em;
-}
-
-.mse-placeholder span {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 14px;
+.mse-brand-lockup__text small {
+  color: rgba(247, 248, 255, 0.42);
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.mse-media-shell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 26px;
+  aspect-ratio: var(--mse-media-ratio, 1722 / 962);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
+    rgba(7, 11, 20, 0.92);
+}
+
+.mse-media-shell--hero {
+  --mse-media-ratio: 1482 / 1014;
+}
+
+.mse-media-shell--contain .mse-media {
+  object-fit: contain;
+}
+
+.mse-media-shell--cover .mse-media {
+  object-fit: cover;
+}
+
+.mse-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #050711;
 }
 
 .mse-floating-card {
@@ -793,13 +934,13 @@ font-size: clamp(24px, 4.5vw, 60px);
 }
 
 .mse-floating-card--left {
-  left: -36px;
-  bottom: 56px;
+  left: clamp(-68px, -4.1vw, -20px);
+  bottom: clamp(20px, 3.6vw, 48px);
 }
 
 .mse-floating-card--right {
-  top: 80px;
-  right: -24px;
+  top: clamp(34px, 5.8vw, 72px);
+  right: clamp(-14px, -1vw, 6px);
 }
 
 .mse-floating-card span,
@@ -812,16 +953,9 @@ font-size: clamp(24px, 4.5vw, 60px);
 }
 
 .mse-floating-card strong {
-  color: var(--mse-text);
   font-size: 24px;
   font-weight: 950;
   letter-spacing: -0.04em;
-}
-
-.mse-floating-card small {
-  color: rgba(139, 220, 255, 0.72);
-  letter-spacing: 0.02em;
-  text-transform: none;
 }
 
 .mse-section {
@@ -830,10 +964,11 @@ font-size: clamp(24px, 4.5vw, 60px);
 }
 
 .mse-section--why,
-.mse-section--workflow {
+.mse-section--workflow,
+.mse-section--docs {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
-    radial-gradient(circle at 50% 0%, rgba(139, 220, 255, 0.06), transparent 36rem);
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.04), transparent 36rem);
 }
 
 .mse-section__intro {
@@ -862,14 +997,18 @@ font-size: clamp(24px, 4.5vw, 60px);
 .mse-comparison__card p,
 .mse-feature-card p,
 .mse-workflow-item__copy p,
-.mse-format-card p {
+.mse-format-card p,
+.mse-showcase-card p,
+.mse-docs-spotlight__intro p:not(.mse-kicker),
+.mse-docs-card p {
   color: var(--mse-muted);
   line-height: 1.78;
 }
 
 .mse-section__intro p:not(.mse-kicker),
 .mse-tech-layout__copy > p:not(.mse-kicker),
-.mse-final-cta p {
+.mse-final-cta p,
+.mse-docs-spotlight__intro p:not(.mse-kicker) {
   margin: 22px 0 0;
   font-size: 17px;
 }
@@ -884,7 +1023,10 @@ font-size: clamp(24px, 4.5vw, 60px);
 .mse-feature-card,
 .mse-workflow-item__copy,
 .mse-format-card,
-.mse-final-cta__panel {
+.mse-final-cta__panel,
+.mse-showcase-card,
+.mse-docs-card,
+.mse-docs-spotlight {
   border: 1px solid var(--mse-border);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.045)),
@@ -911,14 +1053,14 @@ font-size: clamp(24px, 4.5vw, 60px);
 .mse-card-label,
 .mse-workflow-item__copy > span {
   width: max-content;
-  padding: 7px 12px;
+  padding: 6px 11px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  color: var(--mse-accent);
-  background: rgba(139, 220, 255, 0.08);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  color: rgba(222, 232, 244, 0.78);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -930,19 +1072,13 @@ font-size: clamp(24px, 4.5vw, 60px);
 .mse-comparison__card h3,
 .mse-feature-card h3,
 .mse-workflow-item__copy h3,
-.mse-format-card h3 {
+.mse-format-card h3,
+.mse-showcase-card h3,
+.mse-docs-card h3 {
   margin: 0;
-  color: var(--mse-text);
   font-size: clamp(24px, 3vw, 34px);
   line-height: 1.12;
   letter-spacing: -0.045em;
-}
-
-.mse-comparison__card p,
-.mse-feature-card p,
-.mse-workflow-item__copy p,
-.mse-format-card p {
-  margin: 0;
 }
 
 .mse-csv-panel,
@@ -992,7 +1128,6 @@ font-size: clamp(24px, 4.5vw, 60px);
 
 .mse-curve-panel__area {
   fill: url(#mse-curve-fill);
-  stroke: none;
 }
 
 .mse-curve-panel__line {
@@ -1035,23 +1170,48 @@ font-size: clamp(24px, 4.5vw, 60px);
   opacity: 0.78;
 }
 
-.mse-feature-grid {
+.mse-feature-grid,
+.mse-showcase-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.mse-feature-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
-.mse-feature-card {
-  min-height: 348px;
-  padding: 28px;
-  border-radius: var(--mse-radius-lg);
+.mse-feature-card,
+.mse-showcase-card,
+.mse-docs-card {
   transition:
     transform 180ms ease,
     border-color 180ms ease,
     background 180ms ease;
 }
 
-.mse-feature-card:hover {
+.mse-feature-card {
+  min-height: 348px;
+  padding: 28px;
+  border-radius: var(--mse-radius-lg);
+}
+
+.mse-showcase-card {
+  display: grid;
+  gap: 22px;
+  padding: 28px;
+  border-radius: var(--mse-radius-xl);
+}
+
+.mse-showcase-card__header {
+  display: grid;
+  gap: 14px;
+}
+
+.mse-feature-card:hover,
+.mse-showcase-card:hover,
+.mse-docs-card:hover {
   transform: translateY(-5px);
   border-color: rgba(139, 220, 255, 0.34);
   background:
@@ -1081,10 +1241,6 @@ font-size: clamp(24px, 4.5vw, 60px);
   stroke-width: 1.8;
 }
 
-.mse-feature-card p {
-  margin-top: 16px;
-}
-
 .mse-workflow-list {
   position: relative;
   display: grid;
@@ -1111,7 +1267,7 @@ font-size: clamp(24px, 4.5vw, 60px);
   gap: 32px;
 }
 
-.mse-workflow-item::before {
+/* .mse-workflow-item::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -1124,7 +1280,7 @@ font-size: clamp(24px, 4.5vw, 60px);
   background: var(--mse-accent);
   box-shadow: 0 0 28px rgba(139, 220, 255, 0.78);
   transform: translate(-50%, -50%);
-}
+} */
 
 .mse-workflow-item--reverse {
   grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1fr);
@@ -1150,40 +1306,84 @@ font-size: clamp(24px, 4.5vw, 60px);
   border-radius: var(--mse-radius-lg);
 }
 
+.mse-media-frame--workflow {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.mse-workflow-item:hover .mse-media-frame--workflow {
+  transform: translateY(-4px);
+  border-color: rgba(139, 220, 255, 0.3);
+}
+
+.mse-looping-video {
+  width: 100%;
+  height: 100%;
+}
+
 .mse-section--tech {
   padding-top: 126px;
 }
 
-.mse-tech-layout {
+.mse-tech-layout,
+.mse-docs-spotlight {
   display: grid;
   grid-template-columns: minmax(0, 0.94fr) minmax(390px, 0.78fr);
   align-items: center;
   gap: 44px;
 }
 
-.mse-tech-layout__copy h2 {
-  max-width: 760px;
+.mse-docs-spotlight {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  padding: clamp(30px, 4vw, 42px);
+  border-radius: 38px;
 }
 
-.mse-tech-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.mse-tech-proof-grid,
+.mse-format-card__map {
+  display: grid;
+  gap: 14px;
+}
+
+.mse-tech-proof-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 30px;
 }
 
-.mse-tech-pills span,
+.mse-tech-proof-card {
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mse-tech-proof-card h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.mse-tech-proof-card p {
+  margin: 0;
+  color: rgba(247, 248, 255, 0.72);
+  line-height: 1.66;
+}
+
+.mse-format-card__map {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .mse-format-card__map span {
+  padding: 9px 12px;
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 999px;
   color: rgba(247, 248, 255, 0.82);
   background: rgba(255, 255, 255, 0.07);
+  font-size: 12px;
   font-weight: 850;
-}
-
-.mse-tech-pills span {
-  padding: 10px 14px;
-  font-size: 13px;
+  text-align: center;
 }
 
 .mse-format-card {
@@ -1212,28 +1412,37 @@ font-size: clamp(24px, 4.5vw, 60px);
   letter-spacing: -0.06em;
 }
 
-.mse-format-card__header strong {
-  color: rgba(247, 248, 255, 0.56);
-  font-size: 13px;
+.mse-format-card__header strong,
+.mse-docs-card__eyebrow,
+.mse-docs-card strong {
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.mse-format-card p {
-  margin-top: 16px;
+.mse-docs-spotlight__intro {
+  display: grid;
+  align-content: center;
+  gap: 2px;
 }
 
-.mse-format-card__map {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 30px;
+.mse-docs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.mse-format-card__map span {
-  padding: 9px 12px;
-  font-size: 12px;
+.mse-docs-card {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 28px;
+  text-decoration: none;
+}
+
+.mse-docs-card__eyebrow {
+  color: var(--mse-accent);
 }
 
 .mse-final-cta {
@@ -1254,28 +1463,31 @@ font-size: clamp(24px, 4.5vw, 60px);
     linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.052));
 }
 
-.mse-final-cta__panel h2 {
-  max-width: 780px;
-}
-
 .mse-final-cta__actions {
   flex-direction: column;
   min-width: 260px;
 }
 
-.mse-final-cta__actions small {
-  color: var(--mse-dim);
-  text-align: center;
+@media (max-width: 1380px) {
+  .mse-hero__layout {
+    grid-template-columns: minmax(0, 0.86fr) minmax(500px, 1.14fr);
+    gap: clamp(24px, 4vw, 52px);
+  }
+
+  .mse-hero__copy {
+    max-width: 560px;
+  }
+
+  .mse-hero__showcase .mse-product-frame {
+    width: min(100%, 1120px);
+  }
 }
 
 @media (max-width: 1120px) {
   .mse-hero__layout,
-  .mse-tech-layout {
+  .mse-tech-layout,
+  .mse-docs-spotlight {
     grid-template-columns: 1fr;
-  }
-
-  .mse-hero__copy {
-    max-width: 880px;
   }
 
   .mse-feature-grid {
@@ -1297,7 +1509,10 @@ font-size: clamp(24px, 4.5vw, 60px);
     grid-template-columns: 1fr auto;
   }
 
-  .mse-nav__links {
+  .mse-nav__links,
+  .mse-workflow-list::before,
+  .mse-workflow-item::before,
+  .mse-floating-card {
     display: none;
   }
 
@@ -1307,29 +1522,17 @@ font-size: clamp(24px, 4.5vw, 60px);
   }
 
   .mse-hero h1 {
-    font-size: clamp(46px, 14vw, 74px);
+    max-width: 14ch;
+    font-size: clamp(42px, 11vw, 62px);
   }
 
   .mse-hero__stats,
   .mse-comparison,
   .mse-feature-grid,
-  .mse-final-cta__panel {
-    grid-template-columns: 1fr;
-  }
-
-  .mse-comparison__card {
-    min-height: auto;
-  }
-
-  .mse-floating-card {
-    display: none;
-  }
-
-  .mse-workflow-list::before,
-  .mse-workflow-item::before {
-    display: none;
-  }
-
+  .mse-showcase-grid,
+  .mse-tech-proof-grid,
+  .mse-docs-grid,
+  .mse-final-cta__panel,
   .mse-workflow-item,
   .mse-workflow-item--reverse {
     grid-template-columns: 1fr;
@@ -1342,10 +1545,6 @@ font-size: clamp(24px, 4.5vw, 60px);
 
   .mse-section {
     padding: 82px 0;
-  }
-
-  .mse-final-cta__actions {
-    min-width: 0;
   }
 }
 
@@ -1384,22 +1583,8 @@ font-size: clamp(24px, 4.5vw, 60px);
     display: none;
   }
 
-  .mse-placeholder--hero {
-    min-height: 286px;
-  }
-
-  .mse-placeholder--workflow {
-    min-height: 220px;
-  }
-
-  .mse-feature-card {
+  .mse-media-shell--hero {
     min-height: auto;
-  }
-
-  .mse-csv-panel code {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 </style>
