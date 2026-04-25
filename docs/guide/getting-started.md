@@ -29,7 +29,7 @@ If you want working `.msep` projects to inspect right away, start with these exa
 
 ### Data and assets
 
-- **Assets**: Prepare at least one motor sound source file in `.wav` or `.ogg`.
+- **Assets**: Pepare at least one motor sound source file in `.wav` or `.ogg`.
 - **Parameters**: Prepare the train's basic performance values, such as maximum speed, acceleration, and brake deceleration.
 
 ## 2. Core workflow
