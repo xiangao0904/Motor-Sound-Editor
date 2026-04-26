@@ -135,6 +135,8 @@ export default defineConfig({
   rewrites: generateRewrites(),
 
   head: [
+    ['meta', { name: 'msvalidate.01', content: '211ADBCB24156FB6910E7B92519E40F5' }],
+    ['meta', { name: 'google-site-verification', content: '-1Qe3G3cvhKJLgdg9qdnKINhTLB4YHSqBUAkvS3WnMs' }],
     ["link", { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" }],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
