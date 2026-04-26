@@ -2083,7 +2083,7 @@ onBeforeUnmount(() => {
           aria-label="Acceleration"
           @commit="updateAcceleration"
         />
-        <small>m/s²</small>
+        <small>km/s²</small>
       </label>
 
       <span class="mode-readout">{{ modeLabel }} · {{ activeCurveSet }}</span>
