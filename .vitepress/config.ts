@@ -6,6 +6,7 @@ import path from "node:path";
 
 const sectionMap: Record<string, { en: string; zh: string }> = {
   guide: { en: "Manual", zh: "使用手册" },
+  samples: { en: "Sample Projects", zh: "示例文件" },
   tutorials: { en: "Tutorials", zh: "教程" },
   developers: { en: "For Developers", zh: "针对开发者" },
   miscellaneous: { en: "Miscellaneous", zh: "杂项" },
@@ -183,6 +184,7 @@ export default defineConfig({
       lang: "en-US",
       link: "/",
       themeConfig: {
+        logoLink: "/docs/",
         nav: [
           { text: "Product", link: "/" },
           { text: "Docs", link: "/docs/" },
@@ -205,6 +207,7 @@ export default defineConfig({
       lang: "zh-CN",
       link: "/zh/",
       themeConfig: {
+        logoLink: "/zh/docs/",
         nav: [
           { text: "首页", link: "/zh/" },
           { text: "文档", link: "/zh/docs/" },
