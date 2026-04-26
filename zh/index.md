@@ -1,4 +1,4 @@
 ---
 title: Motor Sound Editor
-description: Motor Sound Editor 中文主页。
+description: 以直观的可视化方式设计你的电机音效。
 ---

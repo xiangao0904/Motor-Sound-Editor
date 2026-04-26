@@ -1,4 +1,4 @@
 ---
 title: Motor Sound Editor
-description: English-first product landing route.
+description: Design your motor sounds with visual precision..
 ---
