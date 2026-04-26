@@ -3,6 +3,9 @@
   --mse-font-body: "Plus Jakarta Sans", "Segoe UI", sans-serif;
   --mse-font-mono: "IBM Plex Mono", "Cascadia Code", monospace;
 
+  --vp-local-search-highlight-bg: #8ADBFE;   /* 搜索匹配到的背景色：明黄色 */
+  --vp-local-search-highlight-text: #000000; /* 搜索匹配到的文字颜色：纯黑色 */
+
   --vp-font-family-base: var(--mse-font-body);
   --vp-font-family-mono: var(--mse-font-mono);
 

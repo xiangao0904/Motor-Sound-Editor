@@ -137,7 +137,7 @@ export const homeContent: Record<HomeLocale, HomeContent> = {
         { value: ".msep", label: "unified project format" },
         { value: "Rust", label: "high-performance core" },
       ],
-      floatingLeft: { eyebrow: "Speed", value: "85 km/h", label: "Real-time" },
+      floatingLeft: { eyebrow: "Speed", value: "72 km/h", label: "Real-time" },
       floatingRight: { eyebrow: "State", value: "Coast", label: "Synchronized" },
     },
     why: {
@@ -345,7 +345,7 @@ export const homeContent: Record<HomeLocale, HomeContent> = {
         { value: ".msep", label: "统一项目格式" },
         { value: "Rust", label: "高性能原生核心" },
       ],
-      floatingLeft: { eyebrow: "当前速度", value: "85 km/h", label: "实时模拟" },
+      floatingLeft: { eyebrow: "当前速度", value: "72 km/h", label: "实时模拟" },
       floatingRight: { eyebrow: "运行状态", value: "惰行", label: "同步预览" },
     },
     why: {
