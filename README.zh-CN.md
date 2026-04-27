@@ -6,7 +6,7 @@
 
 **Motor Sound Editor** 是一款专为 BVE 开发流程设计的专业电机音可视化编辑器。它将开发者从繁琐的 CSV 表格手工编辑中解放出来，提供了一套直观、高效的桌面端工作流，用于构建、预览、保存和导出高质量的列车电机音工程。
 
-![编辑器界面](./website/public/editpage2.png)
+![EditorPage](./public/editpage2.png)
 
 ---
 
