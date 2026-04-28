@@ -1,6 +1,6 @@
 ---
 title: 示例工程
-description: Motor Sound Editor 的实例工程。
+description: Motor Sound Editor 的示例工程。
 ---
 
 # 示例工程
