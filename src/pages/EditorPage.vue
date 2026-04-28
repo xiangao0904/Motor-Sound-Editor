@@ -94,6 +94,8 @@ const audioEngine = new AudioPreviewEngine();
 
 const pitchChartEl = ref<HTMLDivElement | null>(null);
 const volumeChartEl = ref<HTMLDivElement | null>(null);
+const chartWorkspaceEl = ref<HTMLDivElement | null>(null);
+const chartWorkspaceSize = reactive({ width: 0, height: 0 });
 const speedDraft = ref("0.0");
 const toast = ref("");
 const chartContextMenu = reactive<ChartContextMenuState>({
@@ -137,6 +139,10 @@ let isDraggingKeyframe = false;
 let suppressNextChartClick = false;
 let draggingCircle: Konva.Circle | null = null;
 
+const MIN_CHART_ZOOM_X = 1;
+const MAX_CHART_ZOOM_X = 6;
+const CHART_ZOOM_WHEEL_FACTOR = 1.15;
+
 const pitchConfig: ChartConfig = {
   kind: "pitch",
   label: "Pitch",
@@ -168,6 +174,23 @@ const selectedPoint = computed(() => {
       (keyframe) => keyframe.id === selected.keyframeId,
     ) ?? null
   );
+});
+
+const chartZoomSurfaceStyle = computed(() => {
+  const zoomX = clamp(
+    editorStore.view.zoomX,
+    MIN_CHART_ZOOM_X,
+    MAX_CHART_ZOOM_X,
+  );
+  const width = Math.max(
+    420,
+    chartWorkspaceSize.width * zoomX,
+  );
+
+  return {
+    width: `${width}px`,
+    minHeight: `${Math.max(220, chartWorkspaceSize.height)}px`,
+  };
 });
 
 const activeAssetName = computed(() => {
@@ -417,6 +440,70 @@ function resizeStage(runtime: ChartRuntime, container: HTMLDivElement) {
   renderChart(runtime);
 }
 
+function updateChartWorkspaceSize(container: HTMLDivElement) {
+  chartWorkspaceSize.width = container.clientWidth;
+  chartWorkspaceSize.height = container.clientHeight;
+}
+
+function normalizedWheelDelta(event: WheelEvent) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16;
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * window.innerHeight;
+  }
+
+  return event.deltaY;
+}
+
+function syncChartWorkspaceOffset(container: HTMLDivElement) {
+  editorStore.setOffset(container.scrollLeft, container.scrollTop);
+}
+
+function handleChartWorkspaceScroll(event: Event) {
+  syncChartWorkspaceOffset(event.currentTarget as HTMLDivElement);
+}
+
+function handleChartWorkspaceWheel(event: WheelEvent) {
+  const container = event.currentTarget as HTMLDivElement;
+
+  if (event.ctrlKey) {
+    event.preventDefault();
+
+    const oldZoom = clamp(
+      editorStore.view.zoomX,
+      MIN_CHART_ZOOM_X,
+      MAX_CHART_ZOOM_X,
+    );
+    const nextZoom = clamp(
+      oldZoom *
+        (event.deltaY < 0
+          ? CHART_ZOOM_WHEEL_FACTOR
+          : 1 / CHART_ZOOM_WHEEL_FACTOR),
+      MIN_CHART_ZOOM_X,
+      MAX_CHART_ZOOM_X,
+    );
+
+    if (Math.abs(nextZoom - oldZoom) < 0.001) return;
+
+    const rect = container.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const anchoredBaseX = (container.scrollLeft + localX) / oldZoom;
+    const nextScrollLeft = anchoredBaseX * nextZoom - localX;
+
+    editorStore.setZoom(nextZoom, 1);
+    void nextTick(() => {
+      container.scrollLeft = nextScrollLeft;
+      syncChartWorkspaceOffset(container);
+    });
+    return;
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault();
+    container.scrollLeft += normalizedWheelDelta(event);
+    syncChartWorkspaceOffset(container);
+  }
+}
+
 function createStage(container: HTMLDivElement, config: ChartConfig) {
   const stage = new Konva.Stage({
     container,
@@ -442,6 +529,7 @@ function createStage(container: HTMLDivElement, config: ChartConfig) {
   charts.set(config.kind, runtime);
 
   stage.on("click tap", (event) => handleChartClick(runtime, event.evt));
+  stage.on("dblclick dbltap", () => handleChartDoubleClick(runtime));
   stage.on("mouseleave", () => {
     editorStore.hoverKeyframe(null);
     setStageCursor(runtime);
@@ -861,15 +949,11 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
       return;
     }
 
-    const point = canvasToPoint(
-      runtime.stage,
-      runtime.config,
-      pointer.x,
-      pointer.y,
-    );
-    editorStore.setCurrentSpeed(point.speed);
-    queueAudioPreviewSync();
-    renderPlayheads();
+    if (!trackId && !keyframeId) {
+      editorStore.selectKeyframe(null);
+      renderCurveCharts();
+    }
+
     return;
   }
 
@@ -900,6 +984,29 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
     point.value,
     isShiftPressed(event),
   );
+}
+
+function handleChartDoubleClick(runtime: ChartRuntime) {
+  if (editorStore.view.tool !== "select") return;
+
+  const pointer = runtime.stage.getPointerPosition();
+  if (!pointer || isDraggingKeyframe) return;
+
+  const target = runtime.stage.getIntersection(pointer);
+  const trackId = target?.attrs.trackId as string | undefined;
+  const keyframeId = target?.attrs.keyframeId as string | undefined;
+
+  if (trackId || keyframeId) return;
+
+  const point = canvasToPoint(
+    runtime.stage,
+    runtime.config,
+    pointer.x,
+    pointer.y,
+  );
+  editorStore.setCurrentSpeed(point.speed);
+  queueAudioPreviewSync();
+  renderPlayheads();
 }
 
 function handleChartContextMenu(
@@ -1734,8 +1841,39 @@ watch(
   { deep: true },
 );
 
+watch(
+  () => [editorStore.view.offsetX, editorStore.view.offsetY] as const,
+  ([offsetX, offsetY]) => {
+    const container = chartWorkspaceEl.value;
+    if (!container) return;
+
+    void nextTick(() => {
+      if (Math.abs(container.scrollLeft - offsetX) > 1) {
+        container.scrollLeft = offsetX;
+      }
+      if (Math.abs(container.scrollTop - offsetY) > 1) {
+        container.scrollTop = offsetY;
+      }
+    });
+  },
+);
+
 onMounted(() => {
   void nextTick(() => {
+    if (chartWorkspaceEl.value) {
+      updateChartWorkspaceSize(chartWorkspaceEl.value);
+      chartWorkspaceEl.value.scrollLeft = editorStore.view.offsetX;
+      chartWorkspaceEl.value.scrollTop = editorStore.view.offsetY;
+
+      const workspaceObserver = new ResizeObserver(() => {
+        if (chartWorkspaceEl.value) {
+          updateChartWorkspaceSize(chartWorkspaceEl.value);
+        }
+      });
+      workspaceObserver.observe(chartWorkspaceEl.value);
+      resizeObservers.push(workspaceObserver);
+    }
+
     if (pitchChartEl.value) createStage(pitchChartEl.value, pitchConfig);
     if (volumeChartEl.value) createStage(volumeChartEl.value, volumeConfig);
   });
@@ -1872,12 +2010,19 @@ onBeforeUnmount(() => {
       </button>
     </aside>
 
-    <section class="chart-workspace">
-      <div class="chart-panel">
-        <div ref="pitchChartEl" class="chart-host" />
-      </div>
-      <div class="chart-panel">
-        <div ref="volumeChartEl" class="chart-host" />
+    <section
+      ref="chartWorkspaceEl"
+      class="chart-workspace"
+      @scroll="handleChartWorkspaceScroll"
+      @wheel="handleChartWorkspaceWheel"
+    >
+      <div class="chart-zoom-surface" :style="chartZoomSurfaceStyle">
+        <div class="chart-panel">
+          <div ref="pitchChartEl" class="chart-host" />
+        </div>
+        <div class="chart-panel">
+          <div ref="volumeChartEl" class="chart-host" />
+        </div>
       </div>
     </section>
 
@@ -2743,15 +2888,30 @@ onBeforeUnmount(() => {
 }
 
 .chart-workspace {
-  display: grid;
   grid-row: 2;
   grid-column: 2;
-  grid-template-rows: 1fr 1fr;
-  gap: 14px;
   min-width: 0;
   min-height: 0;
-  padding-right: 10px;
+  overflow-x: scroll;
+  overflow-y: hidden;
   background: #354252;
+  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chart-workspace::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.chart-zoom-surface {
+  display: grid;
+  grid-template-rows: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 14px;
+  height: 100%;
+  min-width: 100%;
+  padding-right: 10px;
 }
 
 .chart-panel {

@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 
 import {
-  exportBveProject,
+  exportProjectArchive,
   hasOggExportTracks,
 } from "@/services/bveExport";
 import type { ID } from "@/types/common";
@@ -23,13 +23,34 @@ const emit = defineEmits<{
 }>();
 
 const sampleRates = [22050, 32000, 44100, 48000, 96000];
+const attenuationDistances = [16, 32, 64] as const;
 const selectedFormat = ref<ExportDialogFormat>("bve");
 const sampleRate = ref(44100);
+const attenuationDistance = ref<(typeof attenuationDistances)[number]>(32);
 const isExporting = ref(false);
 const localError = ref("");
 
 const hasOggTracks = computed(() =>
   hasOggExportTracks(props.document, props.assetPayloads),
+);
+const exportTitle = computed(() =>
+  selectedFormat.value === "mtr" ? "Export MTR Package" : "Export BVE Package",
+);
+const exportDefaultPath = computed(() =>
+  selectedFormat.value === "mtr"
+    ? `${props.document.project.meta.name}-MTR.zip`
+    : `${props.document.project.meta.name}-BVE.zip`,
+);
+const exportSuccessMessage = computed(() =>
+  selectedFormat.value === "mtr"
+    ? "MTR export completed"
+    : "BVE export completed",
+);
+const showAttenuationDistance = computed(
+  () => selectedFormat.value === "mtr",
+);
+const showOggWarning = computed(
+  () => selectedFormat.value === "bve" && hasOggTracks.value,
 );
 
 function ensureZipExtension(filePath: string): string {
@@ -37,12 +58,12 @@ function ensureZipExtension(filePath: string): string {
 }
 
 async function runExport() {
-  if (selectedFormat.value !== "bve") return;
+  if (selectedFormat.value === "openbve") return;
 
   localError.value = "";
   const selected = await save({
-    title: "Export BVE Package",
-    defaultPath: `${props.document.project.meta.name}-BVE.zip`,
+    title: exportTitle.value,
+    defaultPath: exportDefaultPath.value,
     filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
   });
 
@@ -50,18 +71,27 @@ async function runExport() {
 
   isExporting.value = true;
   try {
-    await exportBveProject(
+    const options =
+      selectedFormat.value === "mtr"
+        ? {
+            format: "mtr" as const,
+            sampleRate: sampleRate.value,
+            attenuationDistance: attenuationDistance.value,
+          }
+        : {
+            format: "bve" as const,
+            sampleRate: sampleRate.value,
+          };
+
+    await exportProjectArchive(
       props.document,
       props.assetPayloads,
       ensureZipExtension(selected),
-      {
-        format: "bve",
-        sampleRate: sampleRate.value,
-      },
+      options,
     );
-    emit("exported", "BVE export completed");
+    emit("exported", exportSuccessMessage.value);
   } catch (error) {
-    console.error("BVE export failed", error);
+    console.error("Project export failed", error);
     const message = error instanceof Error ? error.message : "Export failed";
     localError.value = message;
     emit("failed", message);
@@ -93,7 +123,7 @@ async function runExport() {
         <select v-model="selectedFormat" :disabled="isExporting">
           <option value="bve">BVE</option>
           <option value="openbve" disabled>OpenBVE</option>
-          <option value="mtr" disabled>MTR</option>
+          <option value="mtr">MTR</option>
         </select>
       </label>
 
@@ -106,7 +136,20 @@ async function runExport() {
         </select>
       </label>
 
-      <p v-if="hasOggTracks" class="warning" role="status">
+      <label v-if="showAttenuationDistance">
+        <span>Attenuation Distance</span>
+        <select v-model.number="attenuationDistance" :disabled="isExporting">
+          <option
+            v-for="distance in attenuationDistances"
+            :key="distance"
+            :value="distance"
+          >
+            {{ distance }}
+          </option>
+        </select>
+      </label>
+
+      <p v-if="showOggWarning" class="warning" role="status">
         Warn ogg file: OGG audio will be converted to WAV for BVE export.
       </p>
       <p v-if="localError" class="error" role="alert">{{ localError }}</p>

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Cursor, ErrorKind, Read, Write};
+use std::num::{NonZeroU32, NonZeroU8};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use symphonia::core::audio::SampleBuffer;
@@ -17,6 +19,7 @@ use tauri::{AppHandle, Manager};
 use winreg::enums::HKEY_CURRENT_USER;
 #[cfg(target_os = "windows")]
 use winreg::RegKey;
+use vorbis_rs::VorbisEncoderBuilder;
 use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
@@ -169,10 +172,24 @@ pub struct BveExportOptions {
     sample_rate: u32,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MtrExportOptions {
+    format: String,
+    sample_rate: u32,
+    attenuation_distance: u32,
+}
+
 #[derive(Debug, Clone)]
 struct DecodedAudio {
     sample_rate: u32,
     channels: Vec<Vec<f32>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EncodedAudioFormat {
+    Wav,
+    OggVorbis,
 }
 
 #[derive(Debug, Clone)]
@@ -180,7 +197,6 @@ struct ExportableTrack {
     track: Track,
     asset: AudioAsset,
     bytes: Vec<u8>,
-    file_name: String,
 }
 
 impl Track {
@@ -296,6 +312,33 @@ fn safe_zip_segment(value: &str) -> String {
         "Motor Sound Export".to_string()
     } else {
         trimmed
+    }
+}
+
+fn safe_slug_segment(value: &str) -> String {
+    let sanitized = safe_zip_segment(value).to_lowercase();
+    let slug = sanitized
+        .chars()
+        .map(|ch| if ch.is_whitespace() { '_' } else { ch })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    let collapsed = slug
+        .split('_')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+
+    if collapsed.is_empty() {
+        "motor_sound_export".to_string()
+    } else {
+        collapsed
     }
 }
 
@@ -543,6 +586,30 @@ fn resample_audio(decoded: &DecodedAudio, target_sample_rate: u32) -> DecodedAud
     }
 }
 
+fn to_mono_average(decoded: &DecodedAudio) -> DecodedAudio {
+    if decoded.channels.is_empty() || decoded.channels.len() == 1 {
+        return decoded.clone();
+    }
+
+    let sample_count = decoded.channels[0].len();
+    let channel_count = decoded.channels.len() as f32;
+    let mut mono = Vec::with_capacity(sample_count);
+
+    for sample_index in 0..sample_count {
+        let sum = decoded
+            .channels
+            .iter()
+            .map(|channel| channel.get(sample_index).copied().unwrap_or(0.0))
+            .sum::<f32>();
+        mono.push(sum / channel_count);
+    }
+
+    DecodedAudio {
+        sample_rate: decoded.sample_rate,
+        channels: vec![mono],
+    }
+}
+
 fn encode_wav_pcm16(decoded: &DecodedAudio) -> Vec<u8> {
     let channel_count = decoded.channels.len() as u16;
     let sample_count = decoded
@@ -587,6 +654,47 @@ fn encode_wav_pcm16(decoded: &DecodedAudio) -> Vec<u8> {
     }
 
     output
+}
+
+fn encode_ogg_vorbis(decoded: &DecodedAudio) -> Result<Vec<u8>, String> {
+    let sample_rate =
+        NonZeroU32::new(decoded.sample_rate).ok_or_else(|| "Sample rate must be greater than 0".to_string())?;
+    let channel_count = u8::try_from(decoded.channels.len())
+        .map_err(|_| "Too many channels for OGG/Vorbis export".to_string())?;
+    let channels =
+        NonZeroU8::new(channel_count).ok_or_else(|| "Audio must contain at least one channel".to_string())?;
+
+    let mut builder = VorbisEncoderBuilder::new(sample_rate, channels, Vec::new())
+        .map_err(|error| error.to_string())?;
+    let mut encoder = builder.build().map_err(|error| error.to_string())?;
+
+    let sample_count = decoded
+        .channels
+        .first()
+        .map(|channel| channel.len())
+        .unwrap_or(0);
+    let block_size = 2048usize;
+
+    for block_start in (0..sample_count).step_by(block_size) {
+        let block_end = (block_start + block_size).min(sample_count);
+        let block = decoded
+            .channels
+            .iter()
+            .map(|channel| channel[block_start..block_end].as_ref())
+            .collect::<Vec<&[f32]>>();
+        encoder
+            .encode_audio_block(block)
+            .map_err(|error| error.to_string())?;
+    }
+
+    encoder.finish().map_err(|error| error.to_string())
+}
+
+fn encode_audio(decoded: &DecodedAudio, format: EncodedAudioFormat) -> Result<Vec<u8>, String> {
+    match format {
+        EncodedAudioFormat::Wav => Ok(encode_wav_pcm16(decoded)),
+        EncodedAudioFormat::OggVorbis => encode_ogg_vorbis(decoded),
+    }
 }
 
 fn collect_speeds(
@@ -670,14 +778,11 @@ fn exportable_tracks(
             let asset_id = track.asset_id.as_ref()?;
             let asset = asset_by_id.get(asset_id)?.clone();
             let bytes = asset_payloads.get(asset_id)?.clone();
-            Some((track.clone(), asset, bytes))
-        })
-        .enumerate()
-        .map(|(index, (track, asset, bytes))| ExportableTrack {
-            track,
-            asset,
-            bytes,
-            file_name: format!("sound_{}.wav", index + 1),
+            Some(ExportableTrack {
+                track: track.clone(),
+                asset,
+                bytes,
+            })
         })
         .collect()
 }
@@ -753,7 +858,7 @@ fn create_bve_archive(
             tracks
                 .iter()
                 .enumerate()
-                .map(|(index, track)| format!("{index} = {}", track.file_name)),
+                .map(|(index, _)| format!("{index} = sound_{}.wav", index + 1)),
         )
         .chain(std::iter::once(String::new()))
         .collect::<Vec<_>>()
@@ -761,20 +866,135 @@ fn create_bve_archive(
     zip.write_all(sound_table.as_bytes())
         .map_err(|error| error.to_string())?;
 
-    for track in &tracks {
+    for (index, track) in tracks.iter().enumerate() {
         let decoded = decode_audio_source(
             None,
             Some(track.asset.file_name.clone()),
             Some(track.bytes.clone()),
         )?;
         let resampled = resample_audio(&decoded, options.sample_rate);
-        let wav_bytes = encode_wav_pcm16(&resampled);
+        let wav_bytes = encode_audio(&resampled, EncodedAudioFormat::Wav)?;
         zip.start_file(
-            format!("{root_name}/sound/{}", track.file_name),
+            format!("{root_name}/sound/sound_{}.wav", index + 1),
             options_zip,
         )
         .map_err(|error| error.to_string())?;
         zip.write_all(&wav_bytes)
+            .map_err(|error| error.to_string())?;
+    }
+
+    zip.finish()
+        .map(|cursor| cursor.into_inner())
+        .map_err(|error| error.to_string())
+}
+
+fn create_mtr_archive(
+    document: &ProjectDocument,
+    asset_payloads: &HashMap<String, Vec<u8>>,
+    options: &MtrExportOptions,
+) -> Result<Vec<u8>, String> {
+    let tracks = exportable_tracks(document, asset_payloads);
+    if tracks.is_empty() {
+        return Err("No exportable tracks have assigned audio.".to_string());
+    }
+
+    let cursor = Cursor::new(Vec::new());
+    let mut zip = ZipWriter::new(cursor);
+    let options_zip = FileOptions::default().compression_method(CompressionMethod::Deflated);
+    let root_name = safe_zip_segment(&document.project.meta.name);
+    let project_slug = safe_slug_segment(&document.project.meta.name);
+    let sound_root = format!("{root_name}/sounds/{project_slug}");
+
+    let mut sound_registry = serde_json::Map::new();
+    for (index, _) in tracks.iter().enumerate() {
+        let audio_slug = format!("motor{index}");
+        sound_registry.insert(
+            format!("{project_slug}_{audio_slug}"),
+            json!({
+                "sounds": [
+                    {
+                        "name": format!("mtr:{project_slug}/{audio_slug}"),
+                        "attenuation_distance": options.attenuation_distance,
+                    }
+                ]
+            }),
+        );
+    }
+
+    zip.start_file(format!("{root_name}/sounds.json"), options_zip)
+        .map_err(|error| error.to_string())?;
+    zip.write_all(
+        serde_json::to_string_pretty(&sound_registry)
+            .map_err(|error| error.to_string())?
+            .as_bytes(),
+    )
+    .map_err(|error| error.to_string())?;
+
+    let sound_cfg = std::iter::once("Version 1.0".to_string())
+        .chain(std::iter::once(String::new()))
+        .chain(std::iter::once("[MTR]".to_string()))
+        .chain(std::iter::once("MotorNoiseDataType = 5".to_string()))
+        .chain(std::iter::once("MotorVolumeMultiply = 1".to_string()))
+        .chain(std::iter::once("DoorCloseSoundLength = 1".to_string()))
+        .chain(std::iter::once(String::new()))
+        .chain(std::iter::once("[Run]".to_string()))
+        .chain(std::iter::once(String::new()))
+        .chain(std::iter::once("[Motor]".to_string()))
+        .chain(
+            tracks
+                .iter()
+                .enumerate()
+                .map(|(index, _)| format!("{index} = motor{index}.wav")),
+        )
+        .chain(std::iter::once(String::new()))
+        .collect::<Vec<_>>()
+        .join("\r\n");
+
+    zip.start_file(format!("{sound_root}/sound.cfg"), options_zip)
+        .map_err(|error| error.to_string())?;
+    zip.write_all(sound_cfg.as_bytes())
+        .map_err(|error| error.to_string())?;
+
+    for (path, curve_set, kind) in [
+        (
+            format!("{sound_root}/powerfreq.csv"),
+            CurveSetKind::Traction,
+            CurveKind::Pitch,
+        ),
+        (
+            format!("{sound_root}/powervol.csv"),
+            CurveSetKind::Traction,
+            CurveKind::Volume,
+        ),
+        (
+            format!("{sound_root}/brakefreq.csv"),
+            CurveSetKind::Brake,
+            CurveKind::Pitch,
+        ),
+        (
+            format!("{sound_root}/brakevol.csv"),
+            CurveSetKind::Brake,
+            CurveKind::Volume,
+        ),
+    ] {
+        zip.start_file(path, options_zip)
+            .map_err(|error| error.to_string())?;
+        zip.write_all(create_motor_noise_csv(&tracks, curve_set, kind)?.as_bytes())
+            .map_err(|error| error.to_string())?;
+    }
+
+    for (index, track) in tracks.iter().enumerate() {
+        let decoded = decode_audio_source(
+            None,
+            Some(track.asset.file_name.clone()),
+            Some(track.bytes.clone()),
+        )?;
+        let resampled = resample_audio(&decoded, options.sample_rate);
+        let mono = to_mono_average(&resampled);
+        let ogg_bytes = encode_audio(&mono, EncodedAudioFormat::OggVorbis)?;
+        zip.start_file(format!("{sound_root}/motor{index}.ogg"), options_zip)
+            .map_err(|error| error.to_string())?;
+        zip.write_all(&ogg_bytes)
             .map_err(|error| error.to_string())?;
     }
 
@@ -1013,5 +1233,23 @@ pub fn export_bve_project(
     }
 
     let archive = create_bve_archive(&document, &asset_payloads, &options)?;
+    fs::write(output_path, archive).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn export_mtr_project(
+    document: ProjectDocument,
+    asset_payloads: HashMap<String, Vec<u8>>,
+    output_path: String,
+    options: MtrExportOptions,
+) -> Result<(), String> {
+    if options.format != "mtr" {
+        return Err("Only MTR export is currently supported.".to_string());
+    }
+    if !matches!(options.attenuation_distance, 16 | 32 | 64) {
+        return Err("Attenuation distance must be 16, 32, or 64.".to_string());
+    }
+
+    let archive = create_mtr_archive(&document, &asset_payloads, &options)?;
     fs::write(output_path, archive).map_err(|error| error.to_string())
 }

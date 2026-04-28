@@ -1,14 +1,25 @@
 import type { ID } from "@/types/common";
 import type { ProjectDocument } from "@/types/project";
 import type { AudioAsset, Track } from "@/types/track";
-import { exportNativeBveProject } from "@/services/nativeInterop";
+import {
+  exportNativeBveProject,
+  exportNativeMtrProject,
+} from "@/services/nativeInterop";
 
-export type ExportFormat = "bve";
+export type ExportFormat = "bve" | "mtr";
 
 export interface BveExportOptions {
-  format: ExportFormat;
+  format: "bve";
   sampleRate: number;
 }
+
+export interface MtrExportOptions {
+  format: "mtr";
+  sampleRate: number;
+  attenuationDistance: 16 | 32 | 64;
+}
+
+export type ExportOptions = BveExportOptions | MtrExportOptions;
 
 interface ExportableTrack {
   track: Track;
@@ -49,20 +60,26 @@ export function hasOggExportTracks(
   );
 }
 
-export async function exportBveProject(
+export async function exportProjectArchive(
   document: ProjectDocument,
   assetPayloads: Map<ID, Uint8Array>,
   outputPath: string,
-  options: BveExportOptions,
+  options: ExportOptions,
 ): Promise<void> {
-  if (options.format !== "bve") {
-    throw new Error("Only BVE export is currently supported.");
-  }
-
   const tracks = exportableTracks(document, assetPayloads);
   if (tracks.length === 0) {
     throw new Error("No exportable tracks have assigned audio.");
   }
 
-  await exportNativeBveProject(document, assetPayloads, outputPath, options);
+  if (options.format === "bve") {
+    await exportNativeBveProject(document, assetPayloads, outputPath, options);
+    return;
+  }
+
+  if (options.format === "mtr") {
+    await exportNativeMtrProject(document, assetPayloads, outputPath, options);
+    return;
+  }
+
+  throw new Error(`Unsupported export format: ${String(options)}`);
 }
