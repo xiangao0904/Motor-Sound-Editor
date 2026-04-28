@@ -50,20 +50,26 @@ function getFileTitle(filePath: string): string | null {
  */
 function generateRewrites() {
   const rewrites: Record<string, string> = {};
-  const zhDocsRootDir = path.resolve(process.cwd(), "./zh/docs");
+  const roots = ["docs", "zh/docs"];
 
-  Object.keys(sectionMap).forEach((folder) => {
-    const zhFolderPath = path.join(zhDocsRootDir, folder);
-    if (!fs.existsSync(zhFolderPath)) return;
+  roots.forEach((root) => {
+    const docsRootDir = path.resolve(process.cwd(), `./${root}`);
+    if (!fs.existsSync(docsRootDir)) return;
 
-    const files = fs.readdirSync(zhFolderPath).filter((f) => f.endsWith(".md"));
-    files.forEach((file) => {
-      const stripped = stripNumberPrefix(file);
-      if (file !== stripped) {
-        rewrites[`zh/docs/${folder}/${file}`] = `zh/docs/${folder}/${stripped}`;
-      }
+    Object.keys(sectionMap).forEach((folder) => {
+      const folderPath = path.join(docsRootDir, folder);
+      if (!fs.existsSync(folderPath)) return;
+
+      const files = fs.readdirSync(folderPath).filter((f) => f.endsWith(".md"));
+      files.forEach((file) => {
+        const stripped = stripNumberPrefix(file);
+        if (file !== stripped) {
+          rewrites[`${root}/${folder}/${file}`] = `${root}/${folder}/${stripped}`;
+        }
+      });
     });
   });
+
   return rewrites;
 }
 
@@ -97,6 +103,9 @@ function generateSyncedSidebar(lang: "en" | "zh") {
             link = `/zh/docs/${folder}/${cleanNameBase}`;
           } else {
             targetFilePath = path.resolve(process.cwd(), `./docs/${folder}/${cleanNameBase}.md`);
+            if (!fs.existsSync(targetFilePath)) {
+              targetFilePath = path.resolve(process.cwd(), `./docs/${folder}/${file}`);
+            }
             link = `/docs/${folder}/${cleanNameBase}`;
           }
 
