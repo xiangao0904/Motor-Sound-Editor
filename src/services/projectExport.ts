@@ -6,27 +6,29 @@ import {
   exportNativeMtrProject,
 } from "@/services/nativeInterop";
 
-export type ExportFormat = "bve" | "mtr";
+export type ProjectExportFormat = "bve" | "mtr";
 
-export interface BveExportOptions {
+export interface BveProjectExportOptions {
   format: "bve";
   sampleRate: number;
 }
 
-export interface MtrExportOptions {
+export interface MtrProjectExportOptions {
   format: "mtr";
   sampleRate: number;
   attenuationDistance: 16 | 32 | 64;
 }
 
-export type ExportOptions = BveExportOptions | MtrExportOptions;
+export type ProjectExportOptions =
+  | BveProjectExportOptions
+  | MtrProjectExportOptions;
 
 interface ExportableTrack {
   track: Track;
   asset: AudioAsset;
 }
 
-function exportableTracks(
+function collectExportableTracks(
   document: ProjectDocument,
   assetPayloads: Map<ID, Uint8Array>,
 ): ExportableTrack[] {
@@ -42,31 +44,26 @@ function exportableTracks(
 
       if (!asset || !bytes) return [];
 
-      return [
-        {
-          track,
-          asset,
-        },
-      ];
+      return [{ track, asset }];
     });
 }
 
-export function hasOggExportTracks(
+export function hasOggSourceTracks(
   document: ProjectDocument,
   assetPayloads: Map<ID, Uint8Array>,
 ): boolean {
-  return exportableTracks(document, assetPayloads).some(
+  return collectExportableTracks(document, assetPayloads).some(
     ({ asset }) => asset.format === "ogg",
   );
 }
 
-export async function exportProjectArchive(
+export async function exportProjectPackage(
   document: ProjectDocument,
   assetPayloads: Map<ID, Uint8Array>,
   outputPath: string,
-  options: ExportOptions,
+  options: ProjectExportOptions,
 ): Promise<void> {
-  const tracks = exportableTracks(document, assetPayloads);
+  const tracks = collectExportableTracks(document, assetPayloads);
   if (tracks.length === 0) {
     throw new Error("No exportable tracks have assigned audio.");
   }
@@ -76,10 +73,5 @@ export async function exportProjectArchive(
     return;
   }
 
-  if (options.format === "mtr") {
-    await exportNativeMtrProject(document, assetPayloads, outputPath, options);
-    return;
-  }
-
-  throw new Error(`Unsupported export format: ${String(options)}`);
+  await exportNativeMtrProject(document, assetPayloads, outputPath, options);
 }

@@ -1999,7 +1999,7 @@ onBeforeUnmount(() => {
           <path d="m7 10 5 5 5-5" />
           <path d="M5 21h14" />
         </svg>
-        <span>Export File</span>
+        <span>Export</span>
       </button>
       <button class="tool-button" type="button" @click="goHome">
         <svg viewBox="0 0 24 24" aria-hidden="true">

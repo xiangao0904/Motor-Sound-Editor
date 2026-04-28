@@ -26,7 +26,10 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 const PROJECT_FILE_NAME: &str = "project.json";
 const TRACKS_FILE_NAME: &str = "tracks.json";
 const SAFE_MIN_PITCH: f64 = 0.01;
-const BVE_CSV_HEADER: &str = "bvets motor noise table 0.01";
+const MOTOR_NOISE_CSV_HEADER: &str = "bvets motor noise table 0.01";
+const NO_EXPORTABLE_TRACKS_MESSAGE: &str = "No exportable tracks have assigned audio.";
+const UNSUPPORTED_EXPORT_COMMAND_MESSAGE: &str =
+    "Selected export format is not supported by this command.";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -186,10 +189,22 @@ struct DecodedAudio {
     channels: Vec<Vec<f32>>,
 }
 
+#[derive(Debug, Clone)]
+struct ExportArchiveNames {
+    root_name: String,
+    project_slug: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum EncodedAudioFormat {
     Wav,
     OggVorbis,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EncodedTrackMode {
+    Wav,
+    MonoOggVorbis,
 }
 
 #[derive(Debug, Clone)]
@@ -339,6 +354,13 @@ fn safe_slug_segment(value: &str) -> String {
         "motor_sound_export".to_string()
     } else {
         collapsed
+    }
+}
+
+fn export_archive_names(document: &ProjectDocument) -> ExportArchiveNames {
+    ExportArchiveNames {
+        root_name: safe_zip_segment(&document.project.meta.name),
+        project_slug: safe_slug_segment(&document.project.meta.name),
     }
 }
 
@@ -751,10 +773,68 @@ fn create_motor_noise_csv(
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    Ok(std::iter::once(BVE_CSV_HEADER.to_string())
+    Ok(std::iter::once(MOTOR_NOISE_CSV_HEADER.to_string())
         .chain(rows)
         .collect::<Vec<_>>()
         .join("\r\n"))
+}
+
+fn write_motor_noise_csv_files(
+    zip: &mut ZipWriter<Cursor<Vec<u8>>>,
+    options_zip: FileOptions,
+    base_path: &str,
+    tracks: &[ExportableTrack],
+) -> Result<(), String> {
+    for (path, curve_set, kind) in [
+        (
+            format!("{base_path}/powerfreq.csv"),
+            CurveSetKind::Traction,
+            CurveKind::Pitch,
+        ),
+        (
+            format!("{base_path}/powervol.csv"),
+            CurveSetKind::Traction,
+            CurveKind::Volume,
+        ),
+        (
+            format!("{base_path}/brakefreq.csv"),
+            CurveSetKind::Brake,
+            CurveKind::Pitch,
+        ),
+        (
+            format!("{base_path}/brakevol.csv"),
+            CurveSetKind::Brake,
+            CurveKind::Volume,
+        ),
+    ] {
+        zip.start_file(path, options_zip)
+            .map_err(|error| error.to_string())?;
+        zip.write_all(create_motor_noise_csv(tracks, curve_set, kind)?.as_bytes())
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn encode_track_bytes(
+    track: &ExportableTrack,
+    sample_rate: u32,
+    mode: EncodedTrackMode,
+) -> Result<Vec<u8>, String> {
+    let decoded = decode_audio_source(
+        None,
+        Some(track.asset.file_name.clone()),
+        Some(track.bytes.clone()),
+    )?;
+    let resampled = resample_audio(&decoded, sample_rate);
+
+    match mode {
+        EncodedTrackMode::Wav => encode_audio(&resampled, EncodedAudioFormat::Wav),
+        EncodedTrackMode::MonoOggVorbis => {
+            let mono = to_mono_average(&resampled);
+            encode_audio(&mono, EncodedAudioFormat::OggVorbis)
+        }
+    }
 }
 
 fn exportable_tracks(
@@ -794,13 +874,14 @@ fn create_bve_archive(
 ) -> Result<Vec<u8>, String> {
     let tracks = exportable_tracks(document, asset_payloads);
     if tracks.is_empty() {
-        return Err("No exportable tracks have assigned audio.".to_string());
+        return Err(NO_EXPORTABLE_TRACKS_MESSAGE.to_string());
     }
 
     let cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(cursor);
     let options_zip = FileOptions::default().compression_method(CompressionMethod::Deflated);
-    let root_name = safe_zip_segment(&document.project.meta.name);
+    let archive_names = export_archive_names(document);
+    let root_name = &archive_names.root_name;
 
     zip.start_file(format!("{root_name}/vehicle.txt"), options_zip)
         .map_err(|error| error.to_string())?;
@@ -819,33 +900,12 @@ fn create_bve_archive(
     )
     .map_err(|error| error.to_string())?;
 
-    for (path, curve_set, kind) in [
-        (
-            format!("{root_name}/motornoise/powerfreq.csv"),
-            CurveSetKind::Traction,
-            CurveKind::Pitch,
-        ),
-        (
-            format!("{root_name}/motornoise/powervol.csv"),
-            CurveSetKind::Traction,
-            CurveKind::Volume,
-        ),
-        (
-            format!("{root_name}/motornoise/brakefreq.csv"),
-            CurveSetKind::Brake,
-            CurveKind::Pitch,
-        ),
-        (
-            format!("{root_name}/motornoise/brakevol.csv"),
-            CurveSetKind::Brake,
-            CurveKind::Volume,
-        ),
-    ] {
-        zip.start_file(path, options_zip)
-            .map_err(|error| error.to_string())?;
-        zip.write_all(create_motor_noise_csv(&tracks, curve_set, kind)?.as_bytes())
-            .map_err(|error| error.to_string())?;
-    }
+    write_motor_noise_csv_files(
+        &mut zip,
+        options_zip,
+        &format!("{root_name}/motornoise"),
+        &tracks,
+    )?;
 
     zip.start_file(format!("{root_name}/sound/Sound.txt"), options_zip)
         .map_err(|error| error.to_string())?;
@@ -867,13 +927,7 @@ fn create_bve_archive(
         .map_err(|error| error.to_string())?;
 
     for (index, track) in tracks.iter().enumerate() {
-        let decoded = decode_audio_source(
-            None,
-            Some(track.asset.file_name.clone()),
-            Some(track.bytes.clone()),
-        )?;
-        let resampled = resample_audio(&decoded, options.sample_rate);
-        let wav_bytes = encode_audio(&resampled, EncodedAudioFormat::Wav)?;
+        let wav_bytes = encode_track_bytes(track, options.sample_rate, EncodedTrackMode::Wav)?;
         zip.start_file(
             format!("{root_name}/sound/sound_{}.wav", index + 1),
             options_zip,
@@ -895,14 +949,15 @@ fn create_mtr_archive(
 ) -> Result<Vec<u8>, String> {
     let tracks = exportable_tracks(document, asset_payloads);
     if tracks.is_empty() {
-        return Err("No exportable tracks have assigned audio.".to_string());
+        return Err(NO_EXPORTABLE_TRACKS_MESSAGE.to_string());
     }
 
     let cursor = Cursor::new(Vec::new());
     let mut zip = ZipWriter::new(cursor);
     let options_zip = FileOptions::default().compression_method(CompressionMethod::Deflated);
-    let root_name = safe_zip_segment(&document.project.meta.name);
-    let project_slug = safe_slug_segment(&document.project.meta.name);
+    let archive_names = export_archive_names(document);
+    let root_name = &archive_names.root_name;
+    let project_slug = &archive_names.project_slug;
     let sound_root = format!("{root_name}/sounds/{project_slug}");
 
     let mut sound_registry = serde_json::Map::new();
@@ -955,43 +1010,14 @@ fn create_mtr_archive(
     zip.write_all(sound_cfg.as_bytes())
         .map_err(|error| error.to_string())?;
 
-    for (path, curve_set, kind) in [
-        (
-            format!("{sound_root}/powerfreq.csv"),
-            CurveSetKind::Traction,
-            CurveKind::Pitch,
-        ),
-        (
-            format!("{sound_root}/powervol.csv"),
-            CurveSetKind::Traction,
-            CurveKind::Volume,
-        ),
-        (
-            format!("{sound_root}/brakefreq.csv"),
-            CurveSetKind::Brake,
-            CurveKind::Pitch,
-        ),
-        (
-            format!("{sound_root}/brakevol.csv"),
-            CurveSetKind::Brake,
-            CurveKind::Volume,
-        ),
-    ] {
-        zip.start_file(path, options_zip)
-            .map_err(|error| error.to_string())?;
-        zip.write_all(create_motor_noise_csv(&tracks, curve_set, kind)?.as_bytes())
-            .map_err(|error| error.to_string())?;
-    }
+    write_motor_noise_csv_files(&mut zip, options_zip, &sound_root, &tracks)?;
 
     for (index, track) in tracks.iter().enumerate() {
-        let decoded = decode_audio_source(
-            None,
-            Some(track.asset.file_name.clone()),
-            Some(track.bytes.clone()),
+        let ogg_bytes = encode_track_bytes(
+            track,
+            options.sample_rate,
+            EncodedTrackMode::MonoOggVorbis,
         )?;
-        let resampled = resample_audio(&decoded, options.sample_rate);
-        let mono = to_mono_average(&resampled);
-        let ogg_bytes = encode_audio(&mono, EncodedAudioFormat::OggVorbis)?;
         zip.start_file(format!("{sound_root}/motor{index}.ogg"), options_zip)
             .map_err(|error| error.to_string())?;
         zip.write_all(&ogg_bytes)
@@ -1229,7 +1255,7 @@ pub fn export_bve_project(
     options: BveExportOptions,
 ) -> Result<(), String> {
     if options.format != "bve" {
-        return Err("Only BVE export is currently supported.".to_string());
+        return Err(UNSUPPORTED_EXPORT_COMMAND_MESSAGE.to_string());
     }
 
     let archive = create_bve_archive(&document, &asset_payloads, &options)?;
@@ -1244,7 +1270,7 @@ pub fn export_mtr_project(
     options: MtrExportOptions,
 ) -> Result<(), String> {
     if options.format != "mtr" {
-        return Err("Only MTR export is currently supported.".to_string());
+        return Err(UNSUPPORTED_EXPORT_COMMAND_MESSAGE.to_string());
     }
     if !matches!(options.attenuation_distance, 16 | 32 | 64) {
         return Err("Attenuation distance must be 16, 32, or 64.".to_string());

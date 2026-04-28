@@ -3,13 +3,28 @@ import { computed, ref } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 
 import {
-  exportProjectArchive,
-  hasOggExportTracks,
-} from "@/services/bveExport";
+  exportProjectPackage,
+  hasOggSourceTracks,
+  type BveProjectExportOptions,
+  type MtrProjectExportOptions,
+  type ProjectExportFormat,
+} from "@/services/projectExport";
 import type { ID } from "@/types/common";
 import type { ProjectDocument } from "@/types/project";
 
-type ExportDialogFormat = "bve" | "openbve" | "mtr";
+type PlaceholderExportFormat = "openbve";
+type ExportDialogFormat = ProjectExportFormat | PlaceholderExportFormat;
+
+interface ExportFormatDefinition {
+  value: ExportDialogFormat;
+  label: string;
+  defaultSuffix: string;
+  dialogTitle: string;
+  successMessage: string;
+  warningText: string | null;
+  supportsAttenuationDistance: boolean;
+  available: boolean;
+}
 
 const props = defineProps<{
   document: ProjectDocument;
@@ -24,6 +39,38 @@ const emit = defineEmits<{
 
 const sampleRates = [22050, 32000, 44100, 48000, 96000];
 const attenuationDistances = [16, 32, 64] as const;
+const exportFormats: ExportFormatDefinition[] = [
+  {
+    value: "bve",
+    label: "BVE",
+    defaultSuffix: "BVE",
+    dialogTitle: "Export Package",
+    successMessage: "Export completed",
+    warningText: "OGG audio will be converted to WAV in this package.",
+    supportsAttenuationDistance: false,
+    available: true,
+  },
+  {
+    value: "openbve",
+    label: "OpenBVE",
+    defaultSuffix: "OpenBVE",
+    dialogTitle: "Export Package",
+    successMessage: "Export completed",
+    warningText: null,
+    supportsAttenuationDistance: false,
+    available: false,
+  },
+  {
+    value: "mtr",
+    label: "MTR",
+    defaultSuffix: "MTR",
+    dialogTitle: "Export Package",
+    successMessage: "Export completed",
+    warningText: null,
+    supportsAttenuationDistance: true,
+    available: true,
+  },
+];
 const selectedFormat = ref<ExportDialogFormat>("bve");
 const sampleRate = ref(44100);
 const attenuationDistance = ref<(typeof attenuationDistances)[number]>(32);
@@ -31,36 +78,44 @@ const isExporting = ref(false);
 const localError = ref("");
 
 const hasOggTracks = computed(() =>
-  hasOggExportTracks(props.document, props.assetPayloads),
+  hasOggSourceTracks(props.document, props.assetPayloads),
 );
-const exportTitle = computed(() =>
-  selectedFormat.value === "mtr" ? "Export MTR Package" : "Export BVE Package",
+const selectedExportFormat = computed(
+  () =>
+    exportFormats.find((format) => format.value === selectedFormat.value) ??
+    exportFormats[0],
 );
-const exportDefaultPath = computed(() =>
-  selectedFormat.value === "mtr"
-    ? `${props.document.project.meta.name}-MTR.zip`
-    : `${props.document.project.meta.name}-BVE.zip`,
+const exportTitle = computed(() => selectedExportFormat.value.dialogTitle);
+const exportDefaultPath = computed(
+  () =>
+    `${props.document.project.meta.name}-${selectedExportFormat.value.defaultSuffix}.zip`,
 );
-const exportSuccessMessage = computed(() =>
-  selectedFormat.value === "mtr"
-    ? "MTR export completed"
-    : "BVE export completed",
+const exportSuccessMessage = computed(
+  () => selectedExportFormat.value.successMessage,
 );
 const showAttenuationDistance = computed(
-  () => selectedFormat.value === "mtr",
+  () => selectedExportFormat.value.supportsAttenuationDistance,
 );
 const showOggWarning = computed(
-  () => selectedFormat.value === "bve" && hasOggTracks.value,
+  () =>
+    selectedExportFormat.value.value === "bve" &&
+    hasOggTracks.value &&
+    selectedExportFormat.value.warningText !== null,
 );
+const warningText = computed(() => selectedExportFormat.value.warningText);
 
 function ensureZipExtension(filePath: string): string {
   return /\.zip$/i.test(filePath) ? filePath : `${filePath}.zip`;
 }
 
 async function runExport() {
-  if (selectedFormat.value === "openbve") return;
-
   localError.value = "";
+  const formatConfig = selectedExportFormat.value;
+  if (!formatConfig.available) {
+    localError.value = `${formatConfig.label} export is not available yet.`;
+    return;
+  }
+
   const selected = await save({
     title: exportTitle.value,
     defaultPath: exportDefaultPath.value,
@@ -71,19 +126,19 @@ async function runExport() {
 
   isExporting.value = true;
   try {
-    const options =
-      selectedFormat.value === "mtr"
+    const options: BveProjectExportOptions | MtrProjectExportOptions =
+      formatConfig.value === "mtr"
         ? {
-            format: "mtr" as const,
+            format: "mtr",
             sampleRate: sampleRate.value,
             attenuationDistance: attenuationDistance.value,
           }
         : {
-            format: "bve" as const,
+            format: "bve",
             sampleRate: sampleRate.value,
           };
 
-    await exportProjectArchive(
+    await exportProjectPackage(
       props.document,
       props.assetPayloads,
       ensureZipExtension(selected),
@@ -105,7 +160,7 @@ async function runExport() {
   <div class="modal-backdrop" @click.self="emit('close')">
     <form class="export-dialog" @submit.prevent="runExport">
       <header>
-        <h2>Export File</h2>
+        <h2>Export Package</h2>
         <button
           type="button"
           aria-label="Close export dialog"
@@ -121,9 +176,14 @@ async function runExport() {
       <label>
         <span>Export format</span>
         <select v-model="selectedFormat" :disabled="isExporting">
-          <option value="bve">BVE</option>
-          <option value="openbve" disabled>OpenBVE</option>
-          <option value="mtr">MTR</option>
+          <option
+            v-for="format in exportFormats"
+            :key="format.value"
+            :value="format.value"
+            :disabled="!format.available"
+          >
+            {{ format.label }}
+          </option>
         </select>
       </label>
 
@@ -149,8 +209,8 @@ async function runExport() {
         </select>
       </label>
 
-      <p v-if="showOggWarning" class="warning" role="status">
-        Warn ogg file: OGG audio will be converted to WAV for BVE export.
+      <p v-if="showOggWarning && warningText" class="warning" role="status">
+        {{ warningText }}
       </p>
       <p v-if="localError" class="error" role="alert">{{ localError }}</p>
 
