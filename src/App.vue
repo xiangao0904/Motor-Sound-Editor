@@ -18,6 +18,7 @@ import {
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
+import { useI18nStore } from "@/stores/i18n";
 import { useNotificationStore } from "@/stores/notifications";
 import { useProjectStore } from "@/stores/project";
 import { useRecentProjectsStore } from "@/stores/recentProjects";
@@ -34,6 +35,7 @@ const projectStore = useProjectStore();
 const editorStore = useEditorStore();
 const historyStore = useHistoryStore();
 const assetPayloadStore = useAssetPayloadStore();
+const i18n = useI18nStore();
 const notificationStore = useNotificationStore();
 const recentProjectsStore = useRecentProjectsStore();
 
@@ -109,18 +111,18 @@ async function persistProject(saveAs = false) {
       projectStore.document,
       editorStore.runtime,
     );
-    notificationStore.showToast("Project saved successfully");
+    notificationStore.showToast(i18n.t("app.projectSaved"));
     return true;
   } catch (error) {
     console.error("Project save failed", error);
-    notificationStore.showToast("Project could not be saved");
+    notificationStore.showToast(i18n.t("app.projectSaveFailed"));
     return false;
   }
 }
 
 async function openProjectPath(filePath: string) {
   if (!isMsepPath(filePath)) {
-    notificationStore.showToast("Only .msep projects can be opened");
+    notificationStore.showToast(i18n.t("app.openMsepOnly"));
     return;
   }
 
@@ -141,7 +143,7 @@ async function openProjectPath(filePath: string) {
     openEditor();
   } catch (error) {
     console.error("Project open failed", error);
-    notificationStore.showToast("Project could not be opened");
+    notificationStore.showToast(i18n.t("app.projectOpenFailed"));
   }
 }
 
@@ -166,7 +168,7 @@ function applyUndo() {
 
   const snapshot = historyStore.undo(document, editorStore.runtime);
   if (!snapshot) {
-    notificationStore.showToast("Nothing to undo");
+    notificationStore.showToast(i18n.t("app.nothingUndo"));
     return;
   }
 
@@ -174,7 +176,7 @@ function applyUndo() {
     restoreDocumentObjectUrls(snapshot.document, assetPayloadStore.payloads),
   );
   editorStore.replaceRuntime(snapshot.editor);
-  notificationStore.showToast("Undo applied");
+  notificationStore.showToast(i18n.t("app.undoApplied"));
 }
 
 function applyRedo() {
@@ -183,7 +185,7 @@ function applyRedo() {
 
   const snapshot = historyStore.redo(document, editorStore.runtime);
   if (!snapshot) {
-    notificationStore.showToast("Nothing to redo");
+    notificationStore.showToast(i18n.t("app.nothingRedo"));
     return;
   }
 
@@ -191,7 +193,7 @@ function applyRedo() {
     restoreDocumentObjectUrls(snapshot.document, assetPayloadStore.payloads),
   );
   editorStore.replaceRuntime(snapshot.editor);
-  notificationStore.showToast("Redo applied");
+  notificationStore.showToast(i18n.t("app.redoApplied"));
 }
 
 function isTextEditingTarget(target: EventTarget | null) {
@@ -379,20 +381,19 @@ onBeforeUnmount(() => {
     v-if="pendingExitAction"
     class="confirm-backdrop"
     role="presentation"
-    @click.self="cancelPendingExit"
   >
     <section class="confirm-dialog" role="dialog" aria-modal="true">
-      <h2>Unsaved changes</h2>
-      <p>The current project has unsaved operations. Do you want to save before leaving?</p>
+      <h2>{{ i18n.t("app.unsavedTitle") }}</h2>
+      <p>{{ i18n.t("app.unsavedBody") }}</p>
       <footer>
         <button class="ghost" type="button" :disabled="isSavingBeforeExit" @click="leaveWithoutSaving">
-          Don't Save
+          {{ i18n.t("app.dontSave") }}
         </button>
         <button class="ghost" type="button" :disabled="isSavingBeforeExit" @click="cancelPendingExit">
-          Cancel
+          {{ i18n.t("app.cancel") }}
         </button>
         <button class="primary" type="button" :disabled="isSavingBeforeExit" @click="saveAndContinueExit">
-          {{ isSavingBeforeExit ? "Saving" : "Save" }}
+          {{ isSavingBeforeExit ? i18n.t("app.saving") : i18n.t("app.save") }}
         </button>
       </footer>
     </section>

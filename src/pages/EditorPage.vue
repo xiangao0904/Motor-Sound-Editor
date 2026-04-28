@@ -18,6 +18,7 @@ import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
+import { useI18nStore } from "@/stores/i18n";
 import { useProjectStore } from "@/stores/project";
 import { useSettingsStore } from "@/stores/settings";
 import { AudioPreviewEngine } from "@/services/audioPreview";
@@ -89,6 +90,7 @@ const projectStore = useProjectStore();
 const assetPayloadStore = useAssetPayloadStore();
 const editorStore = useEditorStore();
 const historyStore = useHistoryStore();
+const i18n = useI18nStore();
 const settingsStore = useSettingsStore();
 const audioEngine = new AudioPreviewEngine();
 
@@ -195,16 +197,9 @@ const chartZoomSurfaceStyle = computed(() => {
 
 const activeAssetName = computed(() => {
   const track = activeTrack.value;
-  if (!track?.assetId) return "No file";
+  if (!track?.assetId) return i18n.t("editor.noFile");
 
-  return projectStore.assetById.get(track.assetId)?.fileName ?? "No file";
-});
-
-const modeLabel = computed(() => {
-  const mode = editorStore.simulator.mode;
-  if (mode === "traction") return "Traction";
-  if (mode === "brake") return "Brake";
-  return "Coasting";
+  return projectStore.assetById.get(track.assetId)?.fileName ?? i18n.t("editor.noFile");
 });
 
 const listEditorTrack = computed(() => {
@@ -236,8 +231,8 @@ const canDeleteListContextKeyframe = computed(() => {
 
 const listSyncLabel = computed(() =>
   listContextMenu.curveSet === "brake"
-    ? "Sync brake to traction"
-    : "Sync traction to brake",
+    ? i18n.t("editor.syncBrakeToTraction")
+    : i18n.t("editor.syncTractionToBrake"),
 );
 const projectStats = computed(() => {
   const document = projectStore.document;
@@ -258,7 +253,7 @@ const projectStats = computed(() => {
   }, 0);
 
   return {
-    filePath: projectStore.currentFilePath ?? "Unsaved project",
+    filePath: projectStore.currentFilePath ?? i18n.t("editor.unsavedProject"),
     trackCount: document.tracks.tracks.length,
     assetCount: document.tracks.assets.length,
     assignedAudioCount: document.tracks.tracks.filter((track) => track.assetId)
@@ -301,21 +296,68 @@ function isShiftPressed(event: Event) {
   return "shiftKey" in event && event.shiftKey === true;
 }
 
+function isCtrlPressed(event: Event) {
+  return "ctrlKey" in event && event.ctrlKey === true;
+}
+
+type SnapMode = "none" | "step" | "grid";
+
+function snapModeFromEvent(event: Event): SnapMode {
+  if (isCtrlPressed(event)) return "grid";
+  return isShiftPressed(event) ? "step" : "none";
+}
+
+function gridLineCount(config: ChartConfig, axis: "x" | "y") {
+  if (axis === "x") return Math.max(2, settingsStore.grid.xLineCount);
+
+  return Math.max(
+    2,
+    config.kind === "pitch"
+      ? settingsStore.grid.pitchYLineCount
+      : settingsStore.grid.volumeYLineCount,
+  );
+}
+
+function snapToGrid(
+  config: ChartConfig,
+  point: { speed: number; value: number },
+) {
+  const maxSpeed = editorStore.simulator.maxSpeed || 1;
+  const speedStep = maxSpeed / (gridLineCount(config, "x") - 1);
+  const valueStep = config.maxValue / (gridLineCount(config, "y") - 1);
+
+  return {
+    speed: snapToStep(point.speed, speedStep),
+    value: snapToStep(point.value, valueStep),
+  };
+}
+
 function normalizeChartPoint(
   config: ChartConfig,
   point: { speed: number; value: number },
-  shouldSnap: boolean,
+  snapMode: SnapMode = "none",
 ) {
-  const speed = shouldSnap
-    ? snapToStep(point.speed, settingsStore.keyframeSnap.speedStep)
-    : point.speed;
-  const value = shouldSnap
-    ? snapToStep(point.value, settingsStore.keyframeSnap.valueStep)
-    : point.value;
+  const snappedPoint =
+    snapMode === "grid"
+      ? snapToGrid(config, point)
+      : {
+          speed:
+            snapMode === "step"
+              ? snapToStep(point.speed, settingsStore.keyframeSnap.speedStep)
+              : point.speed,
+          value:
+            snapMode === "step"
+              ? snapToStep(point.value, settingsStore.keyframeSnap.valueStep)
+              : point.value,
+        };
 
   return {
-    speed: clamp(speed, 0, editorStore.simulator.maxSpeed),
-    value: clamp(value, CURVE_MIN_VALUE[config.kind], config.maxValue),
+    speed: clamp(snappedPoint.speed, 0, editorStore.simulator.maxSpeed),
+    value: clamp(
+      snappedPoint.value,
+      CURVE_MIN_VALUE[config.kind],
+      config.maxValue,
+    ),
   };
 }
 
@@ -651,7 +693,7 @@ function saveProjectDetails() {
   if (nextName !== currentName) {
     projectStore.setProjectMeta({ name: nextName });
     pushHistory("Update project details");
-    showToast("Project details saved");
+    showToast(i18n.t("editor.projectDetailsSaved"));
   }
 
   isProjectDetailsOpen.value = false;
@@ -661,7 +703,7 @@ function addKeyframeAtChartPoint(
   runtime: ChartRuntime,
   speed: number,
   value: number,
-  shouldSnap = false,
+  snapMode: SnapMode = "none",
 ) {
   const active = activeTrack.value;
   if (!active || active.visible === false) return null;
@@ -669,7 +711,7 @@ function addKeyframeAtChartPoint(
   const point = normalizeChartPoint(
     runtime.config,
     { speed, value },
-    shouldSnap,
+    snapMode,
   );
   const curve = active.curveSets[activeCurveSet.value][runtime.config.kind];
   const keyframe = projectStore.addKeyframe(
@@ -769,7 +811,7 @@ function updateListCell(
 function openListEditor() {
   const track = activeTrack.value;
   if (!track) {
-    showToast("Select a track first");
+    showToast(i18n.t("editor.selectTrackFirst"));
     return;
   }
 
@@ -982,7 +1024,7 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
     runtime,
     point.speed,
     point.value,
-    isShiftPressed(event),
+    snapModeFromEvent(event),
   );
 }
 
@@ -1044,7 +1086,7 @@ function handleChartContextMenu(
   const menuPoint = normalizeChartPoint(
     runtime.config,
     point,
-    isShiftPressed(event.evt),
+    snapModeFromEvent(event.evt),
   );
 
   closeListContextMenu();
@@ -1099,9 +1141,11 @@ function renderBackgroundChart(runtime: ChartRuntime) {
     }),
   );
 
-  for (let index = 0; index <= 12; index += 1) {
-    const x = bounds.left + ((bounds.right - bounds.left) / 12) * index;
-    const speed = (maxSpeed / 12) * index;
+  const xLineCount = gridLineCount(config, "x");
+  const xSegmentCount = xLineCount - 1;
+  for (let index = 0; index < xLineCount; index += 1) {
+    const x = bounds.left + ((bounds.right - bounds.left) / xSegmentCount) * index;
+    const speed = (maxSpeed / xSegmentCount) * index;
     backgroundLayer.add(
       new Konva.Line({
         points: [x, bounds.top, x, bounds.bottom],
@@ -1122,9 +1166,11 @@ function renderBackgroundChart(runtime: ChartRuntime) {
     );
   }
 
-  for (let index = 0; index <= 5; index += 1) {
-    const y = bounds.bottom - ((bounds.bottom - bounds.top) / 5) * index;
-    const value = (config.maxValue / 5) * index;
+  const yLineCount = gridLineCount(config, "y");
+  const ySegmentCount = yLineCount - 1;
+  for (let index = 0; index < yLineCount; index += 1) {
+    const y = bounds.bottom - ((bounds.bottom - bounds.top) / ySegmentCount) * index;
+    const value = (config.maxValue / ySegmentCount) * index;
     backgroundLayer.add(
       new Konva.Line({
         points: [bounds.left, y, bounds.right, y],
@@ -1151,7 +1197,7 @@ function renderBackgroundChart(runtime: ChartRuntime) {
       y: stage.height() - 22,
       width: 116,
       align: "center",
-      text: "Speed (km/h)",
+      text: `${i18n.t("editor.speedLabel")} (km/h)`,
       fontSize: 14,
       fill: "#F3F7FA",
     }),
@@ -1160,7 +1206,7 @@ function renderBackgroundChart(runtime: ChartRuntime) {
     new Konva.Text({
       x: 4,
       y: (bounds.top + bounds.bottom) / 2 + 42,
-      text: `${config.label} (${config.unit})`,
+      text: `${i18n.t(config.kind === "pitch" ? "editor.pitch" : "editor.volume")} (${config.unit})`,
       fontSize: 13,
       fill: "#F3F7FA",
       rotation: -90,
@@ -1325,9 +1371,9 @@ function renderCurveChart(runtime: ChartRuntime) {
         const movedPoint = normalizeChartPoint(
           config,
           canvasToPoint(stage, config, position.x, position.y),
-          isShiftPressed(event.evt),
+          snapModeFromEvent(event.evt),
         );
-        if (isShiftPressed(event.evt)) {
+        if (snapModeFromEvent(event.evt) !== "none") {
           circle.position(
             pointToCanvas(stage, config, movedPoint.speed, movedPoint.value),
           );
@@ -1364,7 +1410,7 @@ function renderCurveChart(runtime: ChartRuntime) {
             const finalPoint = normalizeChartPoint(
               config,
               canvasToPoint(stage, config, position.x, position.y),
-              isShiftPressed(event.evt),
+              snapModeFromEvent(event.evt),
             );
             const changed =
               Math.abs(finalPoint.speed - initialSpeed) > 0.0001 ||
@@ -1513,7 +1559,7 @@ function setMode(mode: "traction" | "coasting" | "brake") {
 
 function setTool(tool: "select" | "move" | "keyframe") {
   if (tool !== "select" && !activeTrack.value) {
-    showToast("Select a track first");
+    showToast(i18n.t("editor.selectTrackFirst"));
     return;
   }
 
@@ -1629,7 +1675,7 @@ function toggleTrackVisible(trackId: string) {
 async function browseAudioFile() {
   const track = activeTrack.value;
   if (!track) {
-    showToast("Select a track first");
+    showToast(i18n.t("editor.selectTrackFirst"));
     return;
   }
 
@@ -1824,6 +1870,21 @@ watch(
 watch(
   () =>
     [
+      settingsStore.grid.xLineCount,
+      settingsStore.grid.pitchYLineCount,
+      settingsStore.grid.volumeYLineCount,
+      i18n.language,
+    ] as const,
+  () => {
+    if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
+
+    renderAllCharts();
+  },
+);
+
+watch(
+  () =>
+    [
       tracks.value,
       activeTrackId.value,
       activeCurveSet.value,
@@ -1911,27 +1972,31 @@ onBeforeUnmount(() => {
   <main class="editor-shell" @click="closeTransientMenus">
     <header class="titlebar" data-tauri-drag-region>
       <div class="title-lockup">
-        <h1>Motor Sound Editor</h1>
-        <span>{{ meta?.name ?? "Untitled" }}</span>
+        <h1>{{ i18n.t("app.title") }}</h1>
+        <span>{{ meta?.name ?? i18n.t("app.untitled") }}</span>
       </div>
       <div class="window-controls">
         <button
           type="button"
-          aria-label="Minimize"
+          :aria-label="i18n.t('app.minimize')"
           @click.stop="minimizeWindow"
         >
           <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" /></svg>
         </button>
         <button
           type="button"
-          aria-label="Maximize"
+          :aria-label="i18n.t('app.maximize')"
           @click.stop="toggleMaximizeWindow"
         >
           <svg viewBox="0 0 12 12" aria-hidden="true">
             <path d="M3 3h6v6H3z" />
           </svg>
         </button>
-        <button type="button" aria-label="Close" @click.stop="closeWindow">
+        <button
+          type="button"
+          :aria-label="i18n.t('app.close')"
+          @click.stop="closeWindow"
+        >
           <svg viewBox="0 0 12 12" aria-hidden="true">
             <path d="m3 3 6 6M9 3 3 9" />
           </svg>
@@ -1947,7 +2012,7 @@ onBeforeUnmount(() => {
         @click="setTool('select')"
       >
         <img :src="iconSelect" class="toolbar-icon" alt="" aria-hidden="true" />
-        <span>Select Mode</span>
+        <span>{{ i18n.t("editor.selectMode") }}</span>
       </button>
       <button
         class="tool-button"
@@ -1957,7 +2022,7 @@ onBeforeUnmount(() => {
         @click="setTool('move')"
       >
         <img :src="iconMove" class="toolbar-icon" alt="" aria-hidden="true" />
-        <span>Move Mode</span>
+        <span>{{ i18n.t("editor.moveMode") }}</span>
       </button>
       <button
         class="tool-button"
@@ -1972,11 +2037,11 @@ onBeforeUnmount(() => {
           alt=""
           aria-hidden="true"
         />
-        <span>Keyframe</span>
+        <span>{{ i18n.t("editor.keyframe") }}</span>
       </button>
 
       <div class="speed-readout">
-        <span>Current Speed</span>
+        <span>{{ i18n.t("editor.currentSpeed") }}</span>
         <label>
           <StyledNumberInput
             class="speed-readout-input"
@@ -1984,7 +2049,7 @@ onBeforeUnmount(() => {
             min="0"
             :max="editorStore.simulator.maxSpeed"
             step="0.1"
-            aria-label="Current speed"
+            :aria-label="i18n.t('editor.currentSpeed')"
             @commit="commitSpeed"
           />
           <small>km/h</small>
@@ -1999,14 +2064,14 @@ onBeforeUnmount(() => {
           <path d="m7 10 5 5 5-5" />
           <path d="M5 21h14" />
         </svg>
-        <span>Export</span>
+        <span>{{ i18n.t("editor.export") }}</span>
       </button>
       <button class="tool-button" type="button" @click="goHome">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M10 6 4 12l6 6" />
           <path d="M5 12h15" />
         </svg>
-        <span>Return Home</span>
+        <span>{{ i18n.t("editor.returnHome") }}</span>
       </button>
     </aside>
 
@@ -2029,14 +2094,18 @@ onBeforeUnmount(() => {
     <aside class="track-sidebar">
       <section class="panel track-layers">
         <header>
-          <h2>Track Layers</h2>
+          <h2>{{ i18n.t("editor.trackLayers") }}</h2>
           <div class="track-actions">
-            <button type="button" aria-label="Add track" @click="addTrack">
+            <button
+              type="button"
+              :aria-label="i18n.t('editor.addTrack')"
+              @click="addTrack"
+            >
               +
             </button>
             <button
               type="button"
-              aria-label="Delete active track"
+              :aria-label="i18n.t('editor.deleteActiveTrack')"
               :disabled="!activeTrack"
               @click="deleteActiveTrack"
             >
@@ -2052,7 +2121,7 @@ onBeforeUnmount(() => {
             activateTrack(($event.target as HTMLSelectElement).value || null)
           "
         >
-          <option value="">None</option>
+          <option value="">{{ i18n.t("editor.none") }}</option>
           <option v-for="track in tracks" :key="track.id" :value="track.id">
             {{ track.name }}
           </option>
@@ -2103,10 +2172,10 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="panel track-details">
-        <h2>Track Details</h2>
+        <h2>{{ i18n.t("editor.trackDetails") }}</h2>
         <template v-if="activeTrack">
           <label>
-            <span>Name</span>
+            <span>{{ i18n.t("editor.name") }}</span>
             <input
               :value="activeTrack.name"
               type="text"
@@ -2114,7 +2183,7 @@ onBeforeUnmount(() => {
             />
           </label>
           <label>
-            <span>Color</span>
+            <span>{{ i18n.t("editor.color") }}</span>
             <input
               class="color-input"
               :value="activeTrack.color"
@@ -2123,7 +2192,7 @@ onBeforeUnmount(() => {
             />
           </label>
           <label>
-            <span>File</span>
+            <span>{{ i18n.t("editor.file") }}</span>
             <button class="file-picker" type="button" @click="browseAudioFile">
               <span>{{ activeAssetName }}</span>
               <img :src="iconOpenFile" alt="" aria-hidden="true" />
@@ -2141,7 +2210,7 @@ onBeforeUnmount(() => {
                 :max="editorStore.simulator.maxSpeed"
                 step="0.1"
                 :disabled="!selectedPoint"
-                aria-label="Selected keyframe speed"
+                :aria-label="i18n.t('editor.speedLabel')"
                 @commit="updateSelectedPoint('speed', $event)"
               />
               <small>km/h</small>
@@ -2153,7 +2222,7 @@ onBeforeUnmount(() => {
               :model-value="selectedPoint?.value.toFixed(2) ?? ''"
               step="0.01"
               :disabled="!selectedPoint"
-              aria-label="Selected keyframe value"
+              :aria-label="i18n.t('editor.value')"
               @commit="updateSelectedPoint('value', $event)"
             />
           </label>
@@ -2163,10 +2232,10 @@ onBeforeUnmount(() => {
             :disabled="!selectedPoint"
             @click="deleteSelectedPoint"
           >
-            Delete Selected Point
+            {{ i18n.t("editor.deleteSelectedPoint") }}
           </button>
         </template>
-        <p v-else class="empty-details">No active track</p>
+        <p v-else class="empty-details">{{ i18n.t("editor.noActiveTrack") }}</p>
       </section>
     </aside>
 
@@ -2189,49 +2258,48 @@ onBeforeUnmount(() => {
           :class="{ active: editorStore.simulator.mode === 'traction' }"
           @click="setMode('traction')"
         >
-          Traction
+          {{ i18n.t("editor.traction") }}
         </button>
         <button
           type="button"
           :class="{ active: editorStore.simulator.mode === 'coasting' }"
           @click="setMode('coasting')"
         >
-          Coasting
+          {{ i18n.t("editor.coasting") }}
         </button>
         <button
           type="button"
           :class="{ active: editorStore.simulator.mode === 'brake' }"
           @click="setMode('brake')"
         >
-          Brake
+          {{ i18n.t("editor.brake") }}
         </button>
       </div>
 
       <label class="transport-field">
-        <span>Max Speed</span>
+        <span>{{ i18n.t("editor.maxSpeed") }}</span>
         <StyledNumberInput
           :model-value="editorStore.simulator.maxSpeed"
           min="1"
           step="1"
-          aria-label="Max speed"
+          :aria-label="i18n.t('editor.maxSpeed')"
           @commit="updateMaxSpeed"
         />
         <small>km/h</small>
       </label>
 
       <label class="transport-field">
-        <span>Acceleration</span>
+        <span>{{ i18n.t("editor.acceleration") }}</span>
         <StyledNumberInput
           :model-value="editorStore.simulator.acceleration"
           min="0"
           step="0.1"
-          aria-label="Acceleration"
+          :aria-label="i18n.t('editor.acceleration')"
           @commit="updateAcceleration"
         />
         <small>km/s²</small>
       </label>
 
-      <span class="mode-readout">{{ modeLabel }} · {{ activeCurveSet }}</span>
       <span class="version">v{{ APP_VERSION }}</span>
     </footer>
 
@@ -2250,7 +2318,7 @@ onBeforeUnmount(() => {
           <path d="M11 12h1v5h1" />
           <circle cx="12" cy="12" r="9" />
         </svg>
-        Project Details
+        {{ i18n.t("editor.projectDetails") }}
       </button>
       <button
         type="button"
@@ -2261,7 +2329,7 @@ onBeforeUnmount(() => {
           <path d="M12 5v14" />
           <path d="M5 12h14" />
         </svg>
-        Add keyframe here
+        {{ i18n.t("editor.addKeyframeHere") }}
       </button>
       <button type="button" :disabled="!activeTrack" @click="openListEditor">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -2269,22 +2337,21 @@ onBeforeUnmount(() => {
           <path d="M5 12h14" />
           <path d="M5 18h14" />
         </svg>
-        Open list view editor
+        {{ i18n.t("editor.openListEditor") }}
       </button>
     </div>
 
     <div
       v-if="isProjectDetailsOpen && projectStats"
       class="modal-backdrop"
-      @click.self="cancelProjectDetails"
       @click.stop
     >
       <form class="project-details-dialog" @submit.prevent="saveProjectDetails">
         <header>
-          <h2>Project Details</h2>
+          <h2>{{ i18n.t("editor.projectDetails") }}</h2>
           <button
             type="button"
-            aria-label="Close project details"
+            :aria-label="i18n.t('app.close')"
             @click="cancelProjectDetails"
           >
             <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -2294,58 +2361,58 @@ onBeforeUnmount(() => {
         </header>
 
         <label>
-          <span>Project name</span>
+          <span>{{ i18n.t("editor.projectName") }}</span>
           <input v-model="projectNameDraft" type="text" />
         </label>
 
         <dl class="project-stats">
           <div>
-            <dt>File path</dt>
+            <dt>{{ i18n.t("editor.filePath") }}</dt>
             <dd>{{ projectStats.filePath }}</dd>
           </div>
           <div>
-            <dt>Tracks</dt>
+            <dt>{{ i18n.t("editor.tracks") }}</dt>
             <dd>{{ projectStats.trackCount }}</dd>
           </div>
           <div>
-            <dt>Audio assets</dt>
+            <dt>{{ i18n.t("editor.audioAssets") }}</dt>
             <dd>{{ projectStats.assetCount }}</dd>
           </div>
           <div>
-            <dt>Assigned audio</dt>
+            <dt>{{ i18n.t("editor.assignedAudio") }}</dt>
             <dd>{{ projectStats.assignedAudioCount }}</dd>
           </div>
           <div>
-            <dt>Keyframes</dt>
+            <dt>{{ i18n.t("editor.keyframes") }}</dt>
             <dd>{{ projectStats.keyframeCount }}</dd>
           </div>
           <div>
-            <dt>Max speed</dt>
+            <dt>{{ i18n.t("editor.maxSpeed") }}</dt>
             <dd>{{ projectStats.maxSpeed }} km/h</dd>
           </div>
           <div>
-            <dt>Acceleration</dt>
+            <dt>{{ i18n.t("editor.acceleration") }}</dt>
             <dd>{{ projectStats.acceleration }} m/s^2</dd>
           </div>
           <div>
-            <dt>Brake deceleration</dt>
+            <dt>{{ i18n.t("editor.brakeDeceleration") }}</dt>
             <dd>{{ projectStats.brakeDeceleration }} m/s^2</dd>
           </div>
           <div>
-            <dt>Created</dt>
+            <dt>{{ i18n.t("editor.created") }}</dt>
             <dd>{{ formatProjectDate(projectStats.createdAt) }}</dd>
           </div>
           <div>
-            <dt>Updated</dt>
+            <dt>{{ i18n.t("editor.updated") }}</dt>
             <dd>{{ formatProjectDate(projectStats.updatedAt) }}</dd>
           </div>
         </dl>
 
         <footer>
           <button class="ghost" type="button" @click="cancelProjectDetails">
-            Cancel
+            {{ i18n.t("app.cancel") }}
           </button>
-          <button class="primary" type="submit">Save</button>
+          <button class="primary" type="submit">{{ i18n.t("app.save") }}</button>
         </footer>
       </form>
     </div>
@@ -2353,21 +2420,20 @@ onBeforeUnmount(() => {
     <div
       v-if="isListEditorOpen && listDraft"
       class="modal-backdrop"
-      @click.self="cancelListEditor"
       @click.stop="
         closeListContextMenu();
         closeAddKeyframePanel();
       "
     >
-      <section class="list-editor-dialog" aria-label="List view editor">
+      <section class="list-editor-dialog" :aria-label="i18n.t('editor.listViewEditor')">
         <header>
           <div>
-            <h2>List View Editor</h2>
-            <span>{{ listEditorTrack?.name ?? "No active track" }}</span>
+            <h2>{{ i18n.t("editor.listViewEditor") }}</h2>
+            <span>{{ listEditorTrack?.name ?? i18n.t("editor.noActiveTrack") }}</span>
           </div>
           <button
             type="button"
-            aria-label="Close list editor"
+            :aria-label="i18n.t('app.close')"
             @click="cancelListEditor"
           >
             <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -2381,21 +2447,21 @@ onBeforeUnmount(() => {
             <thead>
               <tr>
                 <th colspan="4" @contextmenu="openListContextMenu($event, 'traction')">
-                  traction
+                  {{ i18n.t("editor.traction") }}
                 </th>
                 <th colspan="4" @contextmenu="openListContextMenu($event, 'brake')">
-                  brake
+                  {{ i18n.t("editor.brake") }}
                 </th>
               </tr>
               <tr>
-                <th>speed</th>
-                <th>vol</th>
-                <th>speed</th>
-                <th>pit</th>
-                <th>speed</th>
-                <th>vol</th>
-                <th>speed</th>
-                <th>pit</th>
+                <th>{{ i18n.t("editor.speed") }}</th>
+                <th>{{ i18n.t("editor.volumeShort") }}</th>
+                <th>{{ i18n.t("editor.speed") }}</th>
+                <th>{{ i18n.t("editor.pitchShort") }}</th>
+                <th>{{ i18n.t("editor.speed") }}</th>
+                <th>{{ i18n.t("editor.volumeShort") }}</th>
+                <th>{{ i18n.t("editor.speed") }}</th>
+                <th>{{ i18n.t("editor.pitchShort") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -2575,10 +2641,10 @@ onBeforeUnmount(() => {
 
         <footer>
           <button class="ghost" type="button" @click="cancelListEditor">
-            Cancel
+            {{ i18n.t("app.cancel") }}
           </button>
           <button class="primary" type="button" @click="applyListEditor">
-            Apply
+            {{ i18n.t("app.apply") }}
           </button>
         </footer>
       </section>
@@ -2604,7 +2670,7 @@ onBeforeUnmount(() => {
           <path d="M12 5v14" />
           <path d="M5 12h14" />
         </svg>
-        Add keyframe
+        {{ i18n.t("editor.addKeyframe") }}
       </button>
       <button
         class="danger"
@@ -2617,7 +2683,7 @@ onBeforeUnmount(() => {
           <path d="M9 7V4h6v3" />
           <path d="M8 10v10h8V10" />
         </svg>
-        Delete current keyframe
+        {{ i18n.t("editor.deleteCurrentKeyframe") }}
       </button>
     </div>
 
@@ -2629,37 +2695,37 @@ onBeforeUnmount(() => {
       @click.stop
     >
       <label>
-        <span>Type</span>
+        <span>{{ i18n.t("editor.type") }}</span>
         <select v-model="addKeyframePanel.kind">
-          <option value="volume">Volume</option>
-          <option value="pitch">Pitch</option>
+          <option value="volume">{{ i18n.t("editor.volume") }}</option>
+          <option value="pitch">{{ i18n.t("editor.pitch") }}</option>
         </select>
       </label>
       <label>
-        <span>Speed</span>
+        <span>{{ i18n.t("editor.speedLabel") }}</span>
         <StyledNumberInput
           v-model="addKeyframePanel.speed"
           min="0"
           :max="editorStore.simulator.maxSpeed"
           step="0.01"
-          aria-label="New keyframe speed"
+          :aria-label="i18n.t('editor.speedLabel')"
         />
       </label>
       <label>
-        <span>Value</span>
+        <span>{{ i18n.t("editor.value") }}</span>
         <StyledNumberInput
           v-model="addKeyframePanel.value"
           :min="CURVE_MIN_VALUE[addKeyframePanel.kind]"
           :max="CURVE_MAX_VALUE[addKeyframePanel.kind]"
           step="0.01"
-          aria-label="New keyframe value"
+          :aria-label="i18n.t('editor.value')"
         />
       </label>
       <footer>
         <button class="ghost" type="button" @click="closeAddKeyframePanel">
-          Cancel
+          {{ i18n.t("app.cancel") }}
         </button>
-        <button class="primary" type="submit">Add</button>
+        <button class="primary" type="submit">{{ i18n.t("app.add") }}</button>
       </footer>
     </form>
 
@@ -2713,8 +2779,7 @@ onBeforeUnmount(() => {
 
 .title-lockup span,
 .transport-field span,
-.transport-field small,
-.mode-readout {
+.transport-field small {
   color: rgba(245, 248, 251, 0.68);
 }
 
@@ -3204,12 +3269,6 @@ onBeforeUnmount(() => {
 .transport-field :deep(.styled-number) {
   width: 82px;
   height: 30px;
-}
-
-.mode-readout {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .version {

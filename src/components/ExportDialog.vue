@@ -157,7 +157,7 @@ async function runExport() {
 </script>
 
 <template>
-  <div class="modal-backdrop" @click.self="emit('close')">
+  <div class="modal-backdrop">
     <form class="export-dialog" @submit.prevent="runExport">
       <header>
         <h2>Export Package</h2>

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ExportDialog from "@/components/ExportDialog.vue";
+import SettingsDialog from "@/components/SettingsDialog.vue";
 import StyledNumberInput from "@/components/StyledNumberInput.vue";
 import { APP_VERSION } from "@/types/project";
 import type { ProjectCardItem, ProjectDocument } from "@/types/project";
@@ -14,6 +15,7 @@ import {
   saveMsepProject,
 } from "@/services/msepProject";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
+import { useI18nStore } from "@/stores/i18n";
 import { useProjectStore } from "@/stores/project";
 import { useRecentProjectsStore } from "@/stores/recentProjects";
 import { createProjectPreview } from "@/utils/projectPreview";
@@ -31,6 +33,7 @@ const emit = defineEmits<{
 
 const projectStore = useProjectStore();
 const assetPayloadStore = useAssetPayloadStore();
+const i18n = useI18nStore();
 const recentProjectsStore = useRecentProjectsStore();
 
 const searchQuery = ref("");
@@ -38,6 +41,7 @@ const sortKey = ref<SortKey>("date");
 const contextProjectId = ref<string | null>(null);
 const contextMenu = reactive({ visible: false, x: 0, y: 0 });
 const isCreateDialogOpen = ref(false);
+const isSettingsDialogOpen = ref(false);
 const isPreparingExport = ref(false);
 const exportDocument = ref<ProjectDocument | null>(null);
 const exportAssetPayloads = ref(new Map<string, Uint8Array>());
@@ -116,6 +120,15 @@ function showToast(message: string) {
   }, 2200);
 }
 
+function openSettingsDialog() {
+  closeContextMenu();
+  isSettingsDialogOpen.value = true;
+}
+
+function closeSettingsDialog() {
+  isSettingsDialogOpen.value = false;
+}
+
 function openCreateDialog() {
   closeContextMenu();
   isCreateDialogOpen.value = true;
@@ -175,7 +188,7 @@ async function createProject() {
     console.error("Project create failed", error);
     projectStore.clearProject();
     assetPayloadStore.clear();
-    showToast("Project could not be created");
+    showToast(i18n.t("home.projectCreatedFailed"));
   }
 }
 
@@ -194,7 +207,7 @@ async function browseFile() {
 
 async function openProjectPath(filePath: string) {
   if (!isMsepPath(filePath)) {
-    showToast("Only .msep projects can be opened");
+    showToast(i18n.t("home.onlyMsepOpen"));
     return;
   }
 
@@ -215,13 +228,13 @@ async function openProjectPath(filePath: string) {
     emit("open-editor");
   } catch (error) {
     console.error("Project open failed", error);
-    showToast("Project could not be opened");
+    showToast(i18n.t("home.projectOpenFailed"));
   }
 }
 
 async function importProjectPath(filePath: string): Promise<boolean> {
   if (!isMsepPath(filePath)) {
-    showToast("Only .msep projects can be imported");
+    showToast(i18n.t("home.onlyMsepImport"));
     return false;
   }
 
@@ -236,7 +249,7 @@ async function importProjectPath(filePath: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error("Project import failed", error);
-    showToast("Project could not be imported");
+    showToast(i18n.t("home.projectImportFailed"));
     return false;
   }
 }
@@ -253,7 +266,7 @@ async function browseImportFile() {
   if (typeof selected !== "string") return;
 
   if (await importProjectPath(selected)) {
-    showToast("Project imported");
+    showToast(i18n.t("home.projectImported"));
   }
 }
 
@@ -289,7 +302,7 @@ async function openExportDialogForProject(project: ProjectCardItem) {
     exportAssetPayloads.value = loaded.assetPayloads;
   } catch (error) {
     console.error("Project export load failed", error);
-    showToast("Project could not be loaded for export");
+    showToast(i18n.t("home.exportLoadFailed"));
   } finally {
     isPreparingExport.value = false;
   }
@@ -310,7 +323,7 @@ function deleteProject() {
 
   const removedName = contextProject.value.name;
   recentProjectsStore.removeProject(contextProject.value.id);
-  showToast(`${removedName} removed`);
+  showToast(`${removedName} ${i18n.t("home.removed")}`);
   closeContextMenu();
 }
 
@@ -334,7 +347,7 @@ onMounted(async () => {
 
         const msepPaths = event.payload.paths.filter(isMsepPath);
         if (msepPaths.length === 0) {
-          showToast("Only .msep projects can be imported");
+          showToast(i18n.t("home.onlyMsepImport"));
           return;
         }
 
@@ -348,8 +361,8 @@ onMounted(async () => {
         if (importedCount > 0) {
           showToast(
             importedCount === 1
-              ? "Project imported"
-              : `${importedCount} projects imported`,
+              ? i18n.t("home.projectImported")
+              : `${importedCount} ${i18n.t("home.projectsImported")}`,
           );
         }
       },
@@ -367,23 +380,31 @@ onBeforeUnmount(() => {
 <template>
   <main class="home-shell" @click="closeContextMenu">
     <header class="titlebar" data-tauri-drag-region>
-      <h1>Motor Sound Editor</h1>
+      <h1>{{ i18n.t("app.title") }}</h1>
       <div class="window-controls">
-        <button type="button" aria-label="Minimize" @click.stop="minimizeWindow">
+        <button
+          type="button"
+          :aria-label="i18n.t('app.minimize')"
+          @click.stop="minimizeWindow"
+        >
           <svg viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2 6h8" />
           </svg>
         </button>
         <button
           type="button"
-          aria-label="Maximize"
+          :aria-label="i18n.t('app.maximize')"
           @click.stop="toggleMaximizeWindow"
         >
           <svg viewBox="0 0 12 12" aria-hidden="true">
             <path d="M3 3h6v6H3z" />
           </svg>
         </button>
-        <button type="button" aria-label="Close" @click.stop="closeWindow">
+        <button
+          type="button"
+          :aria-label="i18n.t('app.close')"
+          @click.stop="closeWindow"
+        >
           <svg viewBox="0 0 12 12" aria-hidden="true">
             <path d="m3 3 6 6M9 3 3 9" />
           </svg>
@@ -391,39 +412,43 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <aside class="sidebar" aria-label="Project actions">
+    <aside class="sidebar" :aria-label="i18n.t('home.recentProjects')">
       <div class="primary-actions">
         <button class="sidebar-action" type="button" @click.stop="openCreateDialog">
           <img :src="iconNewFile" class="sidebar-icon" alt="" aria-hidden="true" />
-          <span>New Project</span>
+          <span>{{ i18n.t("home.newProject") }}</span>
         </button>
 
         <button class="sidebar-action" type="button" @click.stop="browseFile">
           <img :src="iconOpenFile" class="sidebar-icon" alt="" aria-hidden="true" />
-          <span>Open File</span>
+          <span>{{ i18n.t("home.openFile") }}</span>
         </button>
 
         <button class="sidebar-action" type="button" @click.stop="browseImportFile">
           <img :src="iconImportFile" class="sidebar-icon" alt="" aria-hidden="true" />
-          <span>Import File</span>
+          <span>{{ i18n.t("home.importFile") }}</span>
         </button>
       </div>
 
       <button
         class="sidebar-action settings-action"
         type="button"
-        @click.stop="showToast('Settings reserved')"
+        @click.stop="openSettingsDialog"
       >
         <img :src="iconSettings" class="sidebar-icon" alt="" aria-hidden="true" />
-        <span>Settings</span>
+        <span>{{ i18n.t("home.settings") }}</span>
       </button>
     </aside>
 
     <section class="workspace">
       <div class="content">
         <div class="toolbar">
-          <label class="search-field" aria-label="Search projects">
-            <input v-model="searchQuery" type="search" placeholder="Search" />
+          <label class="search-field" :aria-label="i18n.t('home.search')">
+            <input
+              v-model="searchQuery"
+              type="search"
+              :placeholder="i18n.t('home.search')"
+            />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="10.5" cy="10.5" r="5.5" />
               <path d="m15 15 5 5" />
@@ -431,27 +456,27 @@ onBeforeUnmount(() => {
           </label>
 
           <div class="sort-control" aria-label="Sort projects">
-            <span>Sort by:</span>
+            <span>{{ i18n.t("home.sortBy") }}</span>
             <div class="segmented">
               <button
                 type="button"
                 :class="{ active: sortKey === 'date' }"
                 @click.stop="sortKey = 'date'"
               >
-                Date
+                {{ i18n.t("home.sortDate") }}
               </button>
               <button
                 type="button"
                 :class="{ active: sortKey === 'name' }"
                 @click.stop="sortKey = 'name'"
               >
-                Name
+                {{ i18n.t("home.sortName") }}
               </button>
             </div>
           </div>
         </div>
 
-        <section class="project-gallery" aria-label="Recent projects">
+        <section class="project-gallery" :aria-label="i18n.t('home.recentProjects')">
           <article
             v-for="project in filteredProjects"
             :key="project.id"
@@ -473,12 +498,15 @@ onBeforeUnmount(() => {
               </svg>
             </div>
             <h2>{{ project.name }}</h2>
-            <p>Last modified: {{ formatProjectTime(project.lastModified) }}</p>
+            <p>
+              {{ i18n.t("home.lastModified") }}
+              {{ formatProjectTime(project.lastModified) }}
+            </p>
           </article>
 
           <div v-if="filteredProjects.length === 0" class="empty-state">
-            <h2>No projects found</h2>
-            <p>Try another file name or create a new motor sound project.</p>
+            <h2>{{ i18n.t("home.noProjects") }}</h2>
+            <p>{{ i18n.t("home.noProjectsHint") }}</p>
           </div>
         </section>
       </div>
@@ -500,7 +528,7 @@ onBeforeUnmount(() => {
           <path d="m7 10 5 5 5-5" />
           <path d="M5 21h14" />
         </svg>
-        Export
+        {{ i18n.t("home.export") }}
       </button>
       <button class="danger" type="button" @click="deleteProject">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -508,7 +536,7 @@ onBeforeUnmount(() => {
           <path d="M9 7V4h6v3" />
           <path d="M8 10v10h8V10" />
         </svg>
-        Delete
+        {{ i18n.t("app.delete") }}
       </button>
     </div>
 
@@ -521,15 +549,20 @@ onBeforeUnmount(() => {
       @failed="showToast"
     />
 
+    <SettingsDialog v-if="isSettingsDialogOpen" @close="closeSettingsDialog" />
+
     <div
       v-if="isCreateDialogOpen"
       class="modal-backdrop"
-      @click.self="closeCreateDialog"
     >
       <form class="project-dialog" @submit.prevent="createProject">
         <header>
-          <h2>New Project</h2>
-          <button type="button" aria-label="Close dialog" @click="closeCreateDialog">
+          <h2>{{ i18n.t("home.newProject") }}</h2>
+          <button
+            type="button"
+            :aria-label="i18n.t('app.close')"
+            @click="closeCreateDialog"
+          >
             <svg viewBox="0 0 12 12" aria-hidden="true">
               <path d="m3 3 6 6M9 3 3 9" />
             </svg>
@@ -537,33 +570,33 @@ onBeforeUnmount(() => {
         </header>
 
         <label>
-          <span>Project name</span>
+          <span>{{ i18n.t("home.projectName") }}</span>
           <input
             v-model="newProject.name"
             type="text"
-            placeholder="My motor sound"
+            :placeholder="i18n.t('home.projectNamePlaceholder')"
             autofocus
           />
         </label>
 
         <div class="dialog-grid">
           <label>
-            <span>Max speed</span>
+            <span>{{ i18n.t("home.maxSpeed") }}</span>
             <StyledNumberInput
               :model-value="newProject.maxSpeed"
               min="1"
               step="1"
-              aria-label="New project max speed"
+              :aria-label="i18n.t('home.maxSpeed')"
               @commit="updateNewProjectMaxSpeed"
             />
           </label>
           <label>
-            <span>Acceleration</span>
+            <span>{{ i18n.t("home.acceleration") }}</span>
             <StyledNumberInput
               :model-value="newProject.acceleration"
               min="0.1"
               step="0.1"
-              aria-label="New project acceleration"
+              :aria-label="i18n.t('home.acceleration')"
               @commit="updateNewProjectAcceleration"
             />
           </label>
@@ -571,9 +604,9 @@ onBeforeUnmount(() => {
 
         <footer>
           <button class="ghost" type="button" @click="closeCreateDialog">
-            Cancel
+            {{ i18n.t("app.cancel") }}
           </button>
-          <button class="primary" type="submit">Create</button>
+          <button class="primary" type="submit">{{ i18n.t("home.create") }}</button>
         </footer>
       </form>
     </div>
