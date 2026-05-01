@@ -17,7 +17,7 @@ Motor Sound Editor 面向希望在可视化编辑器中创作分层电机音效�
 
 ### 下载与安装
 
-- **获取软件**：你可以直接通过[这个安装包链接](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe)下载当前 Windows 安装程序。
+- **获取软件**：你可以直接通过[这个链接](https://github.com/xiangao0904/Motor-Sound-Editor/releases)下载当前 Windows 安装程序。
 - **快速安装**：下载完成后，运行安装程序即可。无需额外安装运行库，Tauri 所需组件已随应用打包。
 
 ### 示例文件

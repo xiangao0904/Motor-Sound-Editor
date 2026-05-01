@@ -133,7 +133,7 @@ const githubPagesBase = "/Motor-Sound-Editor/";
 const siteBase = process.env.GITHUB_ACTIONS ? githubPagesBase : "/";
 const withSiteBase = (p: string) => (p.startsWith("/") ? `${siteBase}${p.slice(1)}` : p);
 
-const installerUrl = "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe";
+const installerUrl = "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
 
 export default defineConfig({
   base: siteBase,

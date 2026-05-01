@@ -14,7 +14,7 @@ const props = withDefaults(
   },
 );
 
-const currentVersion = "v1.0.0";
+const currentVersion = "v1.1.0";
 const githubHref = "https://github.com/xiangao0904/Motor-Sound-Editor";
 const content = computed(() => homeContent[props.locale]);
 const isChinese = computed(() => props.locale === "zh");

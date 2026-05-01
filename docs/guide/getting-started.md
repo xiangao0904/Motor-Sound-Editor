@@ -17,7 +17,7 @@ Motor Sound Editor is built for creators who want to design layered motor sound 
 
 ### Download and install
 
-- **Get the app**: Download the current Windows installer directly from [this release link](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/Motor.Sound.Editor_1.0.0_x64-setup.exe).
+- **Get the app**: Download the current Windows installer directly from [this release link](https://github.com/xiangao0904/Motor-Sound-Editor/releases).
 - **Quick install**: After downloading, run the installer. No extra runtime setup is required because the Tauri dependencies are already bundled with the app.
 
 ### Example files
