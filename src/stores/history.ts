@@ -19,13 +19,17 @@ export const useHistoryStore = defineStore("history", () => {
   const canRedo = computed(() => redoStack.value.length > 0);
 
   function clear() {
+    cancelPendingSnapshot();
+
+    undoStack.value = [];
+    redoStack.value = [];
+  }
+
+  function cancelPendingSnapshot() {
     if (debounceTimer !== null) {
       window.clearTimeout(debounceTimer);
       debounceTimer = null;
     }
-
-    undoStack.value = [];
-    redoStack.value = [];
   }
 
   function setMaxSteps(value: number) {
@@ -76,9 +80,7 @@ export const useHistoryStore = defineStore("history", () => {
     editor: EditorRuntimeState,
     debounceMs = 250,
   ) {
-    if (debounceTimer !== null) {
-      window.clearTimeout(debounceTimer);
-    }
+    cancelPendingSnapshot();
 
     debounceTimer = window.setTimeout(() => {
       pushSnapshot(label, document, editor);
@@ -90,6 +92,8 @@ export const useHistoryStore = defineStore("history", () => {
     currentDocument: ProjectDocument,
     currentEditor: EditorRuntimeState,
   ) {
+    cancelPendingSnapshot();
+
     if (undoStack.value.length <= 1) return null;
 
     const currentSnapshot = createSnapshot(
@@ -113,18 +117,14 @@ export const useHistoryStore = defineStore("history", () => {
   }
 
   function redo(
-    currentDocument: ProjectDocument,
-    currentEditor: EditorRuntimeState,
+    _currentDocument: ProjectDocument,
+    _currentEditor: EditorRuntimeState,
   ) {
+    cancelPendingSnapshot();
+
     const next = redoStack.value.pop();
     if (!next) return null;
-
-    const currentSnapshot = createSnapshot(
-      "current",
-      currentDocument,
-      currentEditor,
-    );
-    undoStack.value.push(currentSnapshot);
+    undoStack.value.push(createSnapshot(next.label, next.document, next.editor));
 
     return {
       document: sanitizeProjectDocument(next.document),
@@ -141,6 +141,7 @@ export const useHistoryStore = defineStore("history", () => {
     canRedo,
 
     clear,
+    cancelPendingSnapshot,
     setMaxSteps,
     pushSnapshot,
     scheduleSnapshot,

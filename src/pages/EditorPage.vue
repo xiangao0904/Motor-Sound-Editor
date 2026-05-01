@@ -86,6 +86,15 @@ interface ListContextMenuState {
   index: number | null;
 }
 
+interface KeyframeDragSession {
+  trackId: string;
+  curveSet: CurveSetKind;
+  kind: CurveKind;
+  keyframeId: string;
+  initialSpeed: number;
+  initialValue: number;
+}
+
 const projectStore = useProjectStore();
 const assetPayloadStore = useAssetPayloadStore();
 const editorStore = useEditorStore();
@@ -138,8 +147,10 @@ let audioPreviewSyncFrame: number | null = null;
 let lastFrameTime = 0;
 let isPreparingKeyframeDrag = false;
 let isDraggingKeyframe = false;
+let isFinalizingKeyframeDrag = false;
 let suppressNextChartClick = false;
 let draggingCircle: Konva.Circle | null = null;
+let keyframeDragSession: KeyframeDragSession | null = null;
 
 const MIN_CHART_ZOOM_X = 1;
 const MAX_CHART_ZOOM_X = 6;
@@ -590,20 +601,105 @@ function createStage(container: HTMLDivElement, config: ChartConfig) {
 function stopCurrentKeyframeDrag() {
   if (!draggingCircle && !isDraggingKeyframe && !isPreparingKeyframeDrag) return;
 
+  if (isPreparingKeyframeDrag && !isDraggingKeyframe) {
+    clearCurrentKeyframeDragState(false);
+    return;
+  }
+
+  finalizeCurrentKeyframeDrag();
+}
+
+function clearCurrentKeyframeDragState(suppressNextClick: boolean) {
   const circle = draggingCircle;
   draggingCircle = null;
+  keyframeDragSession = null;
+  isPreparingKeyframeDrag = false;
+  isDraggingKeyframe = false;
+  suppressNextChartClick = suppressNextClick;
+
+  if (suppressNextClick) {
+    window.setTimeout(() => {
+      suppressNextChartClick = false;
+    }, 0);
+  }
 
   if (circle?.isDragging()) {
     circle.stopDrag();
   }
 
-  isPreparingKeyframeDrag = false;
-  isDraggingKeyframe = false;
-  suppressNextChartClick = false;
   charts.forEach((runtime) => {
     hideKeyframeHoverHint(runtime);
     setStageCursor(runtime);
   });
+}
+
+function finalizeCurrentKeyframeDrag(event?: Event) {
+  if (isFinalizingKeyframeDrag) return;
+
+  const session = keyframeDragSession;
+  if (!session) {
+    clearCurrentKeyframeDragState(false);
+    return;
+  }
+
+  isFinalizingKeyframeDrag = true;
+
+  try {
+    const currentTrack = projectStore.trackById.get(session.trackId);
+    const currentCurve = currentTrack?.curveSets[session.curveSet]?.[session.kind];
+    const currentKeyframe = currentCurve?.keyframes.find(
+      (item) => item.id === session.keyframeId,
+    );
+
+    if (!currentTrack || !currentCurve || !currentKeyframe) return;
+
+    let finalPoint = {
+      speed: currentKeyframe.speed,
+      value: currentKeyframe.value,
+    };
+
+    const runtime = charts.get(session.kind);
+    const circle = draggingCircle;
+    if (runtime && circle) {
+      finalPoint = normalizeChartPoint(
+        runtime.config,
+        canvasToPoint(
+          runtime.stage,
+          runtime.config,
+          circle.x(),
+          circle.y(),
+        ),
+        event ? snapModeFromEvent(event) : "none",
+      );
+    }
+
+    projectStore.updateKeyframe(
+      session.trackId,
+      session.curveSet,
+      session.kind,
+      session.keyframeId,
+      { speed: finalPoint.speed, value: finalPoint.value },
+    );
+    editorStore.selectKeyframe({
+      trackId: session.trackId,
+      curveSet: session.curveSet,
+      kind: session.kind,
+      keyframeId: session.keyframeId,
+    });
+
+    const changed =
+      Math.abs(finalPoint.speed - session.initialSpeed) > 0.0001 ||
+      Math.abs(finalPoint.value - session.initialValue) > 0.0001;
+
+    if (changed) {
+      pushHistory("Move keyframe");
+    }
+  } finally {
+    clearCurrentKeyframeDragState(true);
+    isFinalizingKeyframeDrag = false;
+    queueAudioPreviewSync();
+    renderCurveCharts();
+  }
 }
 
 function isSameSelectedKeyframe(
@@ -1279,8 +1375,6 @@ function renderCurveChart(runtime: ChartRuntime) {
     }
 
     keyframes.forEach((keyframe) => {
-      const initialSpeed = keyframe.speed;
-      const initialValue = keyframe.value;
       const point = pointToCanvas(
         stage,
         config,
@@ -1356,6 +1450,14 @@ function renderCurveChart(runtime: ChartRuntime) {
 
         isDraggingKeyframe = true;
         draggingCircle = circle;
+        keyframeDragSession = {
+          trackId: track.id,
+          curveSet: activeCurveSet.value,
+          kind: config.kind,
+          keyframeId: keyframe.id,
+          initialSpeed: keyframe.speed,
+          initialValue: keyframe.value,
+        };
         editorStore.selectKeyframe({
           trackId: track.id,
           curveSet: activeCurveSet.value,
@@ -1397,54 +1499,7 @@ function renderCurveChart(runtime: ChartRuntime) {
         curveLayer.batchDraw();
       });
       circle.on("dragend", (event) => {
-        try {
-          const currentTrack = projectStore.trackById.get(track.id);
-          const currentCurve =
-            currentTrack?.curveSets[activeCurveSet.value]?.[config.kind];
-          const currentKeyframe = currentCurve?.keyframes.find(
-            (item) => item.id === keyframe.id,
-          );
-
-          if (currentTrack && currentCurve && currentKeyframe) {
-            const position = circle.position();
-            const finalPoint = normalizeChartPoint(
-              config,
-              canvasToPoint(stage, config, position.x, position.y),
-              snapModeFromEvent(event.evt),
-            );
-            const changed =
-              Math.abs(finalPoint.speed - initialSpeed) > 0.0001 ||
-              Math.abs(finalPoint.value - initialValue) > 0.0001;
-
-            projectStore.updateKeyframe(
-              track.id,
-              activeCurveSet.value,
-              config.kind,
-              keyframe.id,
-              { speed: finalPoint.speed, value: finalPoint.value },
-            );
-            editorStore.selectKeyframe({
-              trackId: track.id,
-              curveSet: activeCurveSet.value,
-              kind: config.kind,
-              keyframeId: keyframe.id,
-            });
-            if (changed) {
-              pushHistory("Move keyframe");
-            }
-          }
-        } finally {
-          isPreparingKeyframeDrag = false;
-          isDraggingKeyframe = false;
-          draggingCircle = null;
-          suppressNextChartClick = true;
-          window.setTimeout(() => {
-            suppressNextChartClick = false;
-          }, 0);
-          queueAudioPreviewSync();
-          setStageCursor(runtime);
-          renderCurveCharts();
-        }
+        finalizeCurrentKeyframeDrag(event.evt);
       });
 
       curveLayer.add(circle);
@@ -1821,13 +1876,13 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-function handleGlobalPointerRelease() {
+function handleGlobalPointerRelease(event: Event) {
   if (isPreparingKeyframeDrag && !isDraggingKeyframe) {
-    isPreparingKeyframeDrag = false;
+    clearCurrentKeyframeDragState(false);
     return;
   }
 
-  stopCurrentKeyframeDrag();
+  finalizeCurrentKeyframeDrag(event);
 }
 
 function goHome() {

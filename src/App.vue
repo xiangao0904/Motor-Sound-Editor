@@ -106,11 +106,6 @@ async function persistProject(saveAs = false) {
       lastModified: await readFileModifiedAt(filePath),
         ...(await createProjectPreview(document)),
     });
-    historyStore.pushSnapshot(
-      "Save project",
-      projectStore.document,
-      editorStore.runtime,
-    );
     notificationStore.showToast(i18n.t("app.projectSaved"));
     return true;
   } catch (error) {
@@ -213,10 +208,15 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   if (!withCommand) return;
 
   const key = event.key.toLowerCase();
+  const isTextEditing = isTextEditingTarget(event.target);
 
   if (key === "s" && currentView.value === "editor") {
     event.preventDefault();
     void persistProject(event.shiftKey);
+    return;
+  }
+
+  if (isTextEditing && (key === "z" || key === "y")) {
     return;
   }
 
@@ -235,8 +235,6 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     applyRedo();
     return;
   }
-
-  if (isTextEditingTarget(event.target)) return;
 }
 
 function handleGlobalContextMenu(event: MouseEvent) {
