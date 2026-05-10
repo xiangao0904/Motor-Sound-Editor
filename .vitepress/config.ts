@@ -157,7 +157,7 @@ const withSiteBase = (p: string) =>
 // 用于 Open Graph / Twitter Card 的绝对 URL
 // X / Twitter 更推荐使用绝对 URL，而不是 /card.png 这种相对路径
 const siteUrl = "https://motor-sound-editor.pages.dev";
-const cardImageUrl = `${siteUrl}/card.png`;
+const cardImageUrl = `${siteUrl}/card-1.png`;
 
 const installerUrl =
   "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
