@@ -1583,12 +1583,16 @@ function tick(timestamp: number) {
   const simulator = editorStore.simulator;
   let nextSpeed = simulator.currentSpeed;
   let hitLimit = false;
+  const accelerationKmPerHourPerSecond = simulator.acceleration * 3.6;
+  const brakeDecelerationKmPerHourPerSecond =
+    simulator.brakeDeceleration * 3.6;
 
   if (simulator.mode === "traction") {
-    nextSpeed = simulator.currentSpeed + simulator.acceleration * delta;
+    nextSpeed = simulator.currentSpeed + accelerationKmPerHourPerSecond * delta;
     hitLimit = nextSpeed >= simulator.maxSpeed;
   } else if (simulator.mode === "brake") {
-    nextSpeed = simulator.currentSpeed - simulator.brakeDeceleration * delta;
+    nextSpeed =
+      simulator.currentSpeed - brakeDecelerationKmPerHourPerSecond * delta;
     hitLimit = nextSpeed <= 0;
   }
 
@@ -2352,7 +2356,7 @@ onBeforeUnmount(() => {
           :aria-label="i18n.t('editor.acceleration')"
           @commit="updateAcceleration"
         />
-        <small>km/s²</small>
+        <small>m/s²</small>
       </label>
 
       <span class="version">v{{ APP_VERSION }}</span>
