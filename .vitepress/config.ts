@@ -64,7 +64,8 @@ function generateRewrites() {
       files.forEach((file) => {
         const stripped = stripNumberPrefix(file);
         if (file !== stripped) {
-          rewrites[`${root}/${folder}/${file}`] = `${root}/${folder}/${stripped}`;
+          rewrites[`${root}/${folder}/${file}`] =
+            `${root}/${folder}/${stripped}`;
         }
       });
     });
@@ -99,12 +100,21 @@ function generateSyncedSidebar(lang: "en" | "zh") {
           let link: string;
 
           if (lang === "zh") {
-            targetFilePath = path.resolve(process.cwd(), `./zh/docs/${folder}/${file}`);
+            targetFilePath = path.resolve(
+              process.cwd(),
+              `./zh/docs/${folder}/${file}`,
+            );
             link = `/zh/docs/${folder}/${cleanNameBase}`;
           } else {
-            targetFilePath = path.resolve(process.cwd(), `./docs/${folder}/${cleanNameBase}.md`);
+            targetFilePath = path.resolve(
+              process.cwd(),
+              `./docs/${folder}/${cleanNameBase}.md`,
+            );
             if (!fs.existsSync(targetFilePath)) {
-              targetFilePath = path.resolve(process.cwd(), `./docs/${folder}/${file}`);
+              targetFilePath = path.resolve(
+                process.cwd(),
+                `./docs/${folder}/${file}`,
+              );
             }
             link = `/docs/${folder}/${cleanNameBase}`;
           }
@@ -114,7 +124,9 @@ function generateSyncedSidebar(lang: "en" | "zh") {
 
           return { text: title, link: encodeURI(link) };
         })
-        .filter((item): item is { text: string; link: string } => item !== null);
+        .filter(
+          (item): item is { text: string; link: string } => item !== null,
+        );
 
       if (items.length === 0) return null;
 
@@ -131,24 +143,44 @@ function generateSyncedSidebar(lang: "en" | "zh") {
 
 const githubPagesBase = "/Motor-Sound-Editor/";
 const siteBase = process.env.GITHUB_ACTIONS ? githubPagesBase : "/";
-const withSiteBase = (p: string) => (p.startsWith("/") ? `${siteBase}${p.slice(1)}` : p);
+const withSiteBase = (p: string) =>
+  p.startsWith("/") ? `${siteBase}${p.slice(1)}` : p;
 
-const installerUrl = "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
+const installerUrl =
+  "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
 
 export default defineConfig({
   base: siteBase,
   lang: "en-US",
   title: "Motor Sound Editor",
   description: "Official product site and user documentation.",
-  
+
   rewrites: generateRewrites(),
 
   head: [
-    ['meta', { name: 'msvalidate.01', content: '211ADBCB24156FB6910E7B92519E40F5' }],
-    ['meta', { name: 'google-site-verification', content: '-1Qe3G3cvhKJLgdg9qdnKINhTLB4YHSqBUAkvS3WnMs' }],
-    ["link", { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" }],
+    [
+      "meta",
+      { name: "msvalidate.01", content: "211ADBCB24156FB6910E7B92519E40F5" },
+    ],
+    [
+      "meta",
+      {
+        name: "google-site-verification",
+        content: "-1Qe3G3cvhKJLgdg9qdnKINhTLB4YHSqBUAkvS3WnMs",
+      },
+    ],
+
+    // favicon
+    [
+      "link",
+      { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" },
+    ],
+
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
-    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    [
+      "link",
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
+    ],
     [
       "link",
       {
@@ -156,37 +188,71 @@ export default defineConfig({
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
     ],
+
+    // Open Graph
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:title", content: "BVE Motor Sound Editor" }],
+    [
+      "meta",
+      {
+        property: "og:description",
+        content:
+          "A dedicated editor for creating and tuning realistic BVE motor sounds.",
+      },
+    ],
+    ["meta", { property: "og:image", content: withSiteBase("/card.png") }],
+    ["meta", { property: "og:image:width", content: "1200" }],
+    ["meta", { property: "og:image:height", content: "630" }],
+    ["meta", { property: "og:url", content: withSiteBase("/") }],
+
+    // Twitter / X Card
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:title", content: "BVE Motor Sound Editor" }],
+    [
+      "meta",
+      {
+        name: "twitter:description",
+        content:
+          "A dedicated editor for creating and tuning realistic BVE motor sounds.",
+      },
+    ],
+    ["meta", { name: "twitter:image", content: withSiteBase("/card.png") }],
   ],
   appearance: false,
   themeConfig: {
     logo: "64x64.png",
-    socialLinks: [{ icon: "github", link: "https://github.com/xiangao0904/Motor-Sound-Editor" }],
+    socialLinks: [
+      {
+        icon: "github",
+        link: "https://github.com/xiangao0904/Motor-Sound-Editor",
+      },
+    ],
 
     // --- 新增：本地搜索配置 ---
     search: {
-      provider: 'local',
+      provider: "local",
       options: {
         locales: {
           zh: {
             translations: {
               button: {
-                buttonText: '搜索文档',
-                buttonAriaLabel: '搜索文档'
+                buttonText: "搜索文档",
+                buttonAriaLabel: "搜索文档",
               },
               modal: {
-                noResultsText: '无法找到相关结果',
-                resetButtonTitle: '清除查询条件',
+                noResultsText: "无法找到相关结果",
+                resetButtonTitle: "清除查询条件",
                 footer: {
-                  selectText: '选择',
-                  navigateText: '切换',
-                  closeText: '关闭'
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                  selectText: "选择",
+                  navigateText: "切换",
+                  closeText: "关闭",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 
   locales: {
