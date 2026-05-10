@@ -32,9 +32,11 @@ function stripNumberPrefix(fileName: string): string {
  */
 function getFileTitle(filePath: string): string | null {
   if (!fs.existsSync(filePath)) return null;
+
   try {
     const content = fs.readFileSync(filePath, "utf-8");
     const match = content.match(/^title:\s*(.*)$/m);
+
     if (match && match[1]) {
       const title = match[1].trim().replace(/^["']|["']$/g, "");
       return title.length > 0 ? title : null;
@@ -42,6 +44,7 @@ function getFileTitle(filePath: string): string | null {
   } catch (e) {
     console.error(`读取标题失败: ${filePath}`);
   }
+
   return null;
 }
 
@@ -61,8 +64,10 @@ function generateRewrites() {
       if (!fs.existsSync(folderPath)) return;
 
       const files = fs.readdirSync(folderPath).filter((f) => f.endsWith(".md"));
+
       files.forEach((file) => {
         const stripped = stripNumberPrefix(file);
+
         if (file !== stripped) {
           rewrites[`${root}/${folder}/${file}`] =
             `${root}/${folder}/${stripped}`;
@@ -110,12 +115,14 @@ function generateSyncedSidebar(lang: "en" | "zh") {
               process.cwd(),
               `./docs/${folder}/${cleanNameBase}.md`,
             );
+
             if (!fs.existsSync(targetFilePath)) {
               targetFilePath = path.resolve(
                 process.cwd(),
                 `./docs/${folder}/${file}`,
               );
             }
+
             link = `/docs/${folder}/${cleanNameBase}`;
           }
 
@@ -143,8 +150,14 @@ function generateSyncedSidebar(lang: "en" | "zh") {
 
 const githubPagesBase = "/Motor-Sound-Editor/";
 const siteBase = process.env.GITHUB_ACTIONS ? githubPagesBase : "/";
+
 const withSiteBase = (p: string) =>
   p.startsWith("/") ? `${siteBase}${p.slice(1)}` : p;
+
+// 用于 Open Graph / Twitter Card 的绝对 URL
+// X / Twitter 更推荐使用绝对 URL，而不是 /card.png 这种相对路径
+const siteUrl = "https://motor-sound-editor.pages.dev";
+const cardImageUrl = `${siteUrl}/card.png`;
 
 const installerUrl =
   "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
@@ -176,6 +189,7 @@ export default defineConfig({
       { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" },
     ],
 
+    // fonts
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     [
       "link",
@@ -191,7 +205,7 @@ export default defineConfig({
 
     // Open Graph
     ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:title", content: "BVE Motor Sound Editor" }],
+    ["meta", { property: "og:title", content: "Motor Sound Editor" }],
     [
       "meta",
       {
@@ -200,14 +214,14 @@ export default defineConfig({
           "A dedicated editor for creating and tuning realistic BVE motor sounds.",
       },
     ],
-    ["meta", { property: "og:image", content: withSiteBase("/card.png") }],
+    ["meta", { property: "og:image", content: cardImageUrl }],
     ["meta", { property: "og:image:width", content: "1200" }],
     ["meta", { property: "og:image:height", content: "630" }],
-    ["meta", { property: "og:url", content: withSiteBase("/") }],
+    ["meta", { property: "og:url", content: siteUrl }],
 
     // Twitter / X Card
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
-    ["meta", { name: "twitter:title", content: "BVE Motor Sound Editor" }],
+    ["meta", { name: "twitter:title", content: "Motor Sound Editor" }],
     [
       "meta",
       {
@@ -216,11 +230,14 @@ export default defineConfig({
           "A dedicated editor for creating and tuning realistic BVE motor sounds.",
       },
     ],
-    ["meta", { name: "twitter:image", content: withSiteBase("/card.png") }],
+    ["meta", { name: "twitter:image", content: cardImageUrl }],
   ],
+
   appearance: false,
+
   themeConfig: {
     logo: "64x64.png",
+
     socialLinks: [
       {
         icon: "github",
@@ -228,7 +245,7 @@ export default defineConfig({
       },
     ],
 
-    // --- 新增：本地搜索配置 ---
+    // 本地搜索配置
     search: {
       provider: "local",
       options: {
@@ -279,6 +296,7 @@ export default defineConfig({
         },
       },
     },
+
     zh: {
       label: "简体中文",
       lang: "zh-CN",
