@@ -162,11 +162,28 @@ const cardImageUrl = `${siteUrl}/card-1.png`;
 const installerUrl =
   "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.0_x64-setup.exe";
 
+const siteDescription =
+  "Motor Sound Editor is a desktop editor for creating, editing, previewing, and tuning realistic BVE and openBVE train motor sounds, traction sounds, and VVVF-style sound data.";
+
 export default defineConfig({
   base: siteBase,
+
   lang: "en-US",
+
   title: "Motor Sound Editor",
-  description: "Official product site and user documentation.",
+
+  // 让页面标题更长，避免 Bing 提示 titles too short
+  titleTemplate: ":title | BVE and openBVE Train Motor Sound Editor",
+
+  description: siteDescription,
+
+  // 让 VitePress 生成 sitemap.xml
+  sitemap: {
+    hostname: siteUrl,
+  },
+
+  // 配合 sitemap 生成 lastmod
+  lastUpdated: true,
 
   rewrites: generateRewrites(),
 
@@ -182,6 +199,9 @@ export default defineConfig({
         content: "-1Qe3G3cvhKJLgdg9qdnKINhTLB4YHSqBUAkvS3WnMs",
       },
     ],
+
+    // canonical
+    ["link", { rel: "canonical", href: siteUrl }],
 
     // favicon
     [
@@ -205,13 +225,18 @@ export default defineConfig({
 
     // Open Graph
     ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:title", content: "Motor Sound Editor" }],
+    [
+      "meta",
+      {
+        property: "og:title",
+        content: "Motor Sound Editor - BVE and openBVE Train Motor Sound Editor",
+      },
+    ],
     [
       "meta",
       {
         property: "og:description",
-        content:
-          "A dedicated editor for creating and tuning realistic BVE motor sounds.",
+        content: siteDescription,
       },
     ],
     ["meta", { property: "og:image", content: cardImageUrl }],
@@ -221,13 +246,18 @@ export default defineConfig({
 
     // Twitter / X Card
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
-    ["meta", { name: "twitter:title", content: "Motor Sound Editor" }],
+    [
+      "meta",
+      {
+        name: "twitter:title",
+        content: "Motor Sound Editor - BVE and openBVE Train Motor Sound Editor",
+      },
+    ],
     [
       "meta",
       {
         name: "twitter:description",
-        content:
-          "A dedicated editor for creating and tuning realistic BVE motor sounds.",
+        content: siteDescription,
       },
     ],
     ["meta", { name: "twitter:image", content: cardImageUrl }],
