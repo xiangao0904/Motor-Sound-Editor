@@ -160,7 +160,7 @@ const siteUrl = "https://motor-sound-editor.pages.dev";
 const cardImageUrl = `${siteUrl}/card-1.png`;
 
 const installerUrl =
-  "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.0/Motor.Sound.Editor_1.1.1_x64-setup.exe";
+  "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.1/Motor.Sound.Editor_1.1.1_x64-setup.exe";
 
 const siteDescription =
   "Motor Sound Editor is a desktop editor for creating, editing, previewing, and tuning realistic BVE and openBVE train motor sounds, traction sounds, and VVVF-style sound data.";
