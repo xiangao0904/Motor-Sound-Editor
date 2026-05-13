@@ -1,6 +1,6 @@
 ﻿---
 title: FAQ
-description: Common questions about file formats, limits, and current behavior.
+description: Find answers about project formats, editor limits, playback behavior, and current export capabilities in Motor Sound Editor.
 ---
 
 # FAQ

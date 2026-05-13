@@ -1,6 +1,6 @@
 ﻿---
 title: 界面总览
-description: 在深入单个工具前，先把应用当作完整工作流来理解。
+description: 在深入单个工具前，先理解 Motor Sound Editor 如何支撑 BVE 列车音效的项目管理、曲线编辑、试听与导出。
 ---
 
 # 界面总览

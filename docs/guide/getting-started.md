@@ -1,6 +1,6 @@
 ﻿---
 title: Getting Started
-description: First-run guidance for Motor Sound Editor users.
+description: Get started with Motor Sound Editor for BVE and openBVE by installing the app, creating a project, previewing curves, and exporting audio.
 ---
 
 # Getting Started
@@ -76,7 +76,7 @@ You can experience the main features of the app through these six steps:
 
 ### Step 6: Export a BVE package
 
-![Export](/docs/output.png)
+![BVE export package output in Motor Sound Editor](/docs/output.png)
 
 1. Click **Export** in the toolbar or menu.
 2. Choose **BVE** in the dialog.

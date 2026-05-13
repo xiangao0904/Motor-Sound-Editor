@@ -1,6 +1,6 @@
 ﻿---
 title: List Editor
-description: Edit traction and brake keyframes in a table-based view.
+description: Edit traction and brake keyframes in a table view when you need precise numeric control over train sound curves.
 ---
 
 # List Editor

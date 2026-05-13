@@ -1,6 +1,6 @@
 ﻿---
 title: 首页
-description: 在首页完成项目新建、打开、导入、搜索与管理。
+description: 在 Motor Sound Editor 首页完成 BVE 列车音效项目的新建、打开、导入、搜索、排序与管理。
 ---
 
 # 首页

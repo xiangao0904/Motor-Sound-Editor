@@ -1,6 +1,6 @@
 ﻿---
 title: First Project
-description: Create a complete first project from scratch.
+description: Build your first BVE motor sound project in Motor Sound Editor, from setup and asset import to preview and export.
 ---
 
 # First Project

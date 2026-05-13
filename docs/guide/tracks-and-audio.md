@@ -1,6 +1,6 @@
 ﻿---
 title: Tracks and Audio
-description: Manage track layers, assign files, and control track state.
+description: Manage track layers, assign audio assets, and control playback behavior for BVE and openBVE motor sound projects.
 ---
 
 # Tracks and Audio

@@ -1,6 +1,6 @@
 ﻿---
 title: Export Workflow
-description: Prepare and export a project package from Motor Sound Editor.
+description: Prepare, validate, and export a Motor Sound Editor project as a BVE-ready package with the right sample-rate and conversion settings.
 ---
 
 # Export Workflow

@@ -1,6 +1,6 @@
 ﻿---
 title: 针对开发者
-description: 面向贡献者的实现入口说明。
+description: 面向贡献者与代码阅读者的开发入口，帮助理解 Motor Sound Editor 的架构、数据流与实现边界。
 ---
 
 # 针对开发者

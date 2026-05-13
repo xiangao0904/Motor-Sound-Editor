@@ -1,6 +1,6 @@
 ﻿---
 title: 导出流程
-description: 从 Motor Sound Editor 准备并导出项目打包产物。
+description: 从 Motor Sound Editor 准备、校验并导出 BVE 可用的项目打包产物与采样率配置。
 ---
 
 # 导出流程

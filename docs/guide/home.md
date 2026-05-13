@@ -1,6 +1,6 @@
 ﻿---
 title: Home and Projects
-description: Use the home screen to create, open, import, search, and manage projects.
+description: Use the Motor Sound Editor home screen to create, open, import, search, sort, and manage BVE train sound projects.
 ---
 
 # Home and Projects

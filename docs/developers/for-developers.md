@@ -1,6 +1,6 @@
 ﻿---
 title: For Developers
-description: Entry points for contributors and code readers.
+description: Developer-oriented entry points for understanding Motor Sound Editor architecture, data flow, and contribution-focused code reading.
 ---
 
 # For Developers

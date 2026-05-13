@@ -1,6 +1,6 @@
 ﻿---
 title: Interface Overview
-description: Read the application as a complete workflow before focusing on individual tools.
+description: Learn how the Motor Sound Editor interface supports BVE train sound authoring across project management, curve editing, preview, and export.
 ---
 
 # Interface Overview

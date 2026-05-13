@@ -1,6 +1,6 @@
 ﻿---
 title: Shortcuts
-description: Keyboard shortcuts and interaction conventions for daily editing.
+description: Reference the keyboard shortcuts and interaction conventions that speed up daily motor sound editing in Motor Sound Editor.
 ---
 
 # Shortcuts

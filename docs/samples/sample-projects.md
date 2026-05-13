@@ -1,7 +1,7 @@
 --- 
 
 title: Sample Project
-description: Sample project for Motor Sound Editor.
+description: Download and inspect sample Motor Sound Editor projects for BVE and openBVE train sound workflows, testing, and onboarding.
 
 ---
 

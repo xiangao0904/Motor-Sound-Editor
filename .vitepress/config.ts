@@ -1,8 +1,10 @@
-﻿import { defineConfig } from "vitepress";
+import {
+  defineConfig,
+  type HeadConfig,
+  type TransformContext,
+} from "vitepress";
 import fs from "node:fs";
 import path from "node:path";
-
-// --- 1. 自动化核心逻辑 ---
 
 const sectionMap: Record<string, { en: string; zh: string }> = {
   guide: { en: "Manual", zh: "使用手册" },
@@ -12,24 +14,15 @@ const sectionMap: Record<string, { en: string; zh: string }> = {
   miscellaneous: { en: "Miscellaneous", zh: "杂项" },
 };
 
-/**
- * 提取数字前缀用于排序 (例如 "01-intro.md" -> 1)
- */
 function getOrder(fileName: string): number {
   const match = fileName.match(/^(\d+)/);
   return match ? parseInt(match[1], 10) : 999;
 }
 
-/**
- * 去掉文件名开头的数字前缀 (例如 "01-intro.md" -> "intro.md")
- */
 function stripNumberPrefix(fileName: string): string {
   return fileName.replace(/^\d+-/, "");
 }
 
-/**
- * 提取 Markdown 的 title
- */
 function getFileTitle(filePath: string): string | null {
   if (!fs.existsSync(filePath)) return null;
 
@@ -41,16 +34,13 @@ function getFileTitle(filePath: string): string | null {
       const title = match[1].trim().replace(/^["']|["']$/g, "");
       return title.length > 0 ? title : null;
     }
-  } catch (e) {
+  } catch {
     console.error(`读取标题失败: ${filePath}`);
   }
 
   return null;
 }
 
-/**
- * 动态生成 Rewrites 映射表
- */
 function generateRewrites() {
   const rewrites: Record<string, string> = {};
   const roots = ["docs", "zh/docs"];
@@ -79,9 +69,6 @@ function generateRewrites() {
   return rewrites;
 }
 
-/**
- * 自动生成侧边栏
- */
 function generateSyncedSidebar(lang: "en" | "zh") {
   const zhDocsRootDir = path.resolve(process.cwd(), "./zh/docs");
   if (!fs.existsSync(zhDocsRootDir)) return [];
@@ -139,54 +126,176 @@ function generateSyncedSidebar(lang: "en" | "zh") {
 
       return {
         text: lang === "zh" ? sectionMap[folder].zh : sectionMap[folder].en,
-        items: items,
+        items,
         collapsed: false,
       };
     })
     .filter((section) => section !== null);
 }
 
-// --- 2. 基础配置 ---
-
-const githubPagesBase = "/Motor-Sound-Editor/";
-const siteBase = process.env.GITHUB_ACTIONS ? githubPagesBase : "/";
+const defaultSiteUrl = "https://motor-sound-editor.pages.dev";
+const seoTitleSuffix = "BVE and openBVE Train Motor Sound Editor";
+const siteBase = normalizeBase(process.env.SITE_BASE ?? "/");
+const siteUrl = normalizeSiteUrl(process.env.SITE_URL ?? defaultSiteUrl);
+const rewrites = generateRewrites();
 
 const withSiteBase = (p: string) =>
   p.startsWith("/") ? `${siteBase}${p.slice(1)}` : p;
 
-// 用于 Open Graph / Twitter Card 的绝对 URL
-// X / Twitter 更推荐使用绝对 URL，而不是 /card.png 这种相对路径
-const siteUrl = "https://motor-sound-editor.pages.dev";
-const cardImageUrl = `${siteUrl}/card-1.png`;
+const cardImageUrl = toAbsoluteSiteUrl("/card-1.png");
 
 const installerUrl =
   "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.1/Motor.Sound.Editor_1.1.1_x64-setup.exe";
 
 const siteDescription =
-  "Motor Sound Editor is a desktop editor for creating, editing, previewing, and tuning realistic BVE and openBVE train motor sounds, traction sounds, and VVVF-style sound data.";
+  "Motor Sound Editor is a visual BVE and openBVE train sound editor for creating VVVF-style motor sound projects with curve editing, live preview, and export-ready packaging.";
+
+const baseKeywords = [
+  "motor sound editor",
+  "BVE motor sound editor",
+  "openBVE motor sound editor",
+  "train sound editor",
+  "VVVF sound editor",
+  "BVE sound project editor",
+];
+
+function normalizeBase(base: string): string {
+  const prefixed = base.startsWith("/") ? base : `/${base}`;
+  const normalized = prefixed.replace(/\/+/g, "/");
+  return normalized.endsWith("/") ? normalized : `${normalized}/`;
+}
+
+function normalizeSiteUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function toAbsoluteSiteUrl(routePath: string): string {
+  return new URL(withSiteBase(routePath), `${siteUrl}/`).toString();
+}
+
+function toRoutePath(relativePath: string): string {
+  const rewrittenPath = rewrites[relativePath] ?? relativePath;
+
+  if (rewrittenPath === "index.md") return "/";
+  if (rewrittenPath === "zh/index.md") return "/zh/";
+
+  if (rewrittenPath.endsWith("/index.md")) {
+    return `/${rewrittenPath.slice(0, -"index.md".length)}`;
+  }
+
+  return `/${rewrittenPath.replace(/\.md$/, ".html")}`;
+}
+
+function getSeoTitle(pageTitle: string | undefined): string {
+  const resolvedTitle = pageTitle?.trim() || "Motor Sound Editor";
+  return `${resolvedTitle} | ${seoTitleSuffix}`;
+}
+
+function getSeoKeywords(routePath: string): string {
+  const keywords = [...baseKeywords];
+
+  if (routePath.startsWith("/docs/") || routePath.startsWith("/zh/docs/")) {
+    keywords.push(
+      "motor sound editor documentation",
+      "BVE train sound workflow",
+    );
+  }
+
+  if (routePath.includes("/guide/export")) {
+    keywords.push("BVE sound export");
+  }
+
+  return keywords.join(", ");
+}
+
+function getAlternatePages(routePath: string) {
+  if (routePath === "/" || routePath === "/zh/") {
+    return [
+      { lang: "en-US", href: toAbsoluteSiteUrl("/") },
+      { lang: "zh-CN", href: toAbsoluteSiteUrl("/zh/") },
+    ];
+  }
+
+  if (routePath.startsWith("/docs/")) {
+    return [
+      { lang: "en-US", href: toAbsoluteSiteUrl(routePath) },
+      { lang: "zh-CN", href: toAbsoluteSiteUrl(`/zh${routePath}`) },
+    ];
+  }
+
+  if (routePath.startsWith("/zh/docs/")) {
+    const englishRoute = routePath.replace(/^\/zh/, "");
+    return [
+      { lang: "en-US", href: toAbsoluteSiteUrl(englishRoute) },
+      { lang: "zh-CN", href: toAbsoluteSiteUrl(routePath) },
+    ];
+  }
+
+  return [];
+}
+
+function buildSeoHead(context: TransformContext): HeadConfig[] {
+  const routePath = toRoutePath(context.pageData.relativePath);
+  const canonicalUrl = toAbsoluteSiteUrl(routePath);
+  const description = context.description || siteDescription;
+  const title = getSeoTitle(context.pageData.title);
+  const alternatePages = getAlternatePages(routePath);
+  const head: HeadConfig[] = [
+    ["link", { rel: "canonical", href: canonicalUrl }],
+    ["meta", { name: "keywords", content: getSeoKeywords(routePath) }],
+    [
+      "meta",
+      { name: "robots", content: "index, follow, max-image-preview:large" },
+    ],
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:site_name", content: "Motor Sound Editor" }],
+    ["meta", { property: "og:title", content: title }],
+    ["meta", { property: "og:description", content: description }],
+    ["meta", { property: "og:url", content: canonicalUrl }],
+    ["meta", { property: "og:image", content: cardImageUrl }],
+    ["meta", { property: "og:image:width", content: "1200" }],
+    ["meta", { property: "og:image:height", content: "630" }],
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:title", content: title }],
+    ["meta", { name: "twitter:description", content: description }],
+    ["meta", { name: "twitter:image", content: cardImageUrl }],
+  ];
+
+  alternatePages.forEach((page) => {
+    head.push([
+      "link",
+      { rel: "alternate", hreflang: page.lang, href: page.href },
+    ]);
+  });
+
+  if (alternatePages.length > 0) {
+    head.push([
+      "link",
+      {
+        rel: "alternate",
+        hreflang: "x-default",
+        href: alternatePages[0].href,
+      },
+    ]);
+  }
+
+  return head;
+}
 
 export default defineConfig({
   base: siteBase,
-
   lang: "en-US",
-
   title: "Motor Sound Editor",
-
-  // 让页面标题更长，避免 Bing 提示 titles too short
-  titleTemplate: ":title | BVE and openBVE Train Motor Sound Editor",
-
+  titleTemplate: `:title | ${seoTitleSuffix}`,
   description: siteDescription,
-
-  // 让 VitePress 生成 sitemap.xml
   sitemap: {
     hostname: siteUrl,
   },
-
-  // 配合 sitemap 生成 lastmod
   lastUpdated: true,
-
-  rewrites: generateRewrites(),
-
+  rewrites,
+  transformHead(context) {
+    return buildSeoHead(context);
+  },
   head: [
     [
       "meta",
@@ -199,17 +308,10 @@ export default defineConfig({
         content: "-1Qe3G3cvhKJLgdg9qdnKINhTLB4YHSqBUAkvS3WnMs",
       },
     ],
-
-    // canonical
-    ["link", { rel: "canonical", href: siteUrl }],
-
-    // favicon
     [
       "link",
       { rel: "icon", href: withSiteBase("/64x64.png"), type: "image/png" },
     ],
-
-    // fonts
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     [
       "link",
@@ -222,60 +324,19 @@ export default defineConfig({
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
     ],
-
-    // Open Graph
-    ["meta", { property: "og:type", content: "website" }],
-    [
-      "meta",
-      {
-        property: "og:title",
-        content: "Motor Sound Editor - BVE and openBVE Train Motor Sound Editor",
-      },
-    ],
-    [
-      "meta",
-      {
-        property: "og:description",
-        content: siteDescription,
-      },
-    ],
-    ["meta", { property: "og:image", content: cardImageUrl }],
-    ["meta", { property: "og:image:width", content: "1200" }],
-    ["meta", { property: "og:image:height", content: "630" }],
-    ["meta", { property: "og:url", content: siteUrl }],
-
-    // Twitter / X Card
-    ["meta", { name: "twitter:card", content: "summary_large_image" }],
-    [
-      "meta",
-      {
-        name: "twitter:title",
-        content: "Motor Sound Editor - BVE and openBVE Train Motor Sound Editor",
-      },
-    ],
-    [
-      "meta",
-      {
-        name: "twitter:description",
-        content: siteDescription,
-      },
-    ],
-    ["meta", { name: "twitter:image", content: cardImageUrl }],
   ],
-
   appearance: false,
-
   themeConfig: {
-    logo: "64x64.png",
-
+    logo: {
+      src: "64x64.png",
+      alt: "Motor Sound Editor logo",
+    },
     socialLinks: [
       {
         icon: "github",
         link: "https://github.com/xiangao0904/Motor-Sound-Editor",
       },
     ],
-
-    // 本地搜索配置
     search: {
       provider: "local",
       options: {
@@ -301,7 +362,6 @@ export default defineConfig({
       },
     },
   },
-
   locales: {
     root: {
       label: "English",
@@ -326,7 +386,6 @@ export default defineConfig({
         },
       },
     },
-
     zh: {
       label: "简体中文",
       lang: "zh-CN",

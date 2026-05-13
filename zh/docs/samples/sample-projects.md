@@ -1,6 +1,6 @@
 ---
 title: 示例工程
-description: Motor Sound Editor 的示例工程。
+description: 下载并检查用于 BVE 与 openBVE 列车音效流程测试的 Motor Sound Editor 示例工程。
 ---
 
 # 示例工程

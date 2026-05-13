@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://motor-sound-editor.pages.dev/sitemap.xml

@@ -1,6 +1,6 @@
 ﻿---
 title: Background Story
-description: The story behind Motor Sound Editor
+description: Read the development story behind Motor Sound Editor, from early prototypes to a modern BVE train sound editor.
 ---
 # How This Software Was Cobbled Together
 
@@ -36,7 +36,7 @@ This time, I also threw out the old UI that I'd grown to dislike and redrew a mo
 
 I should also mention how much AI coding agents have advanced. With AI assistance, logic that used to give me headaches and felt overly complicated to implement could now be resolved smoothly. It's fair to say that without such powerful coding agents now available, this project would probably still never have been finished.
 
-![Final](/editpage.png)
+![Motor Sound Editor v0.0.1 final interface](/editpage.png)
 <p style="text-align:center">Software v0.0.1</p>
 
 The original motivation for building this tool was simply to spare myself some pain when creating sound effects, and now it's finally done. If you, like me, have ever been tormented by manually hand-crafting CSV files, I hope this little tool can save you some time. And if you enjoy tinkering with cross-platform small apps yourself, Tauri is honestly worth giving a serious try.

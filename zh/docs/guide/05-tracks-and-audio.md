@@ -1,6 +1,6 @@
 ﻿---
 title: 轨道与音频
-description: 管理轨道层、分配文件并控制轨道状态。
+description: 管理轨道图层、分配音频资源，并控制 BVE 与 openBVE 电机音效项目中的播放状态。
 ---
 
 # 轨道与音频

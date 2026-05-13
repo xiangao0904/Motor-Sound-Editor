@@ -1,6 +1,6 @@
 ﻿---
 title: 项目详情与保存
-description: 查看项目元数据、统计信息、保存行为与历史控制。
+description: 查看项目元数据、统计信息、保存行为与历史控制，确保 Motor Sound Editor 工程保持可追踪与可维护。
 ---
 
 # 项目详情与保存

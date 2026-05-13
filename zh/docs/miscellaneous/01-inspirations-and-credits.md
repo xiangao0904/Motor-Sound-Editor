@@ -1,6 +1,6 @@
 ﻿---
 title: 灵感与鸣谢
-description: 关于本项目在构建时参考过的一些软件
+description: 了解在 Motor Sound Editor 设计与实现过程中提供灵感的工具、编辑器与相关参考项目。
 ---
 
 # 灵感与鸣谢

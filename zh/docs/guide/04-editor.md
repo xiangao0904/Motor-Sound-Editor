@@ -1,6 +1,6 @@
 ﻿---
 title: 编辑器工作区
-description: 理解编辑器的主要区域与核心交互方式。
+description: 理解 Motor Sound Editor 的编辑器工作区，包括工具栏、轨道图层、曲线图表与实时试听控制。
 ---
 
 # 编辑器工作区
@@ -20,7 +20,7 @@ description: 理解编辑器的主要区域与核心交互方式。
 
 顶部工具栏包含会影响整个工作区交互方式的全局控制项。
 
-![工具](/docs/tools.png)
+![Motor Sound Editor 工具栏标注图](/docs/tools.png)
 
 - **工具模式（Tool Mode）**：决定你如何与关键帧和曲线交互。
   - **选择工具（Select）**：默认模式，用于选中关键帧。

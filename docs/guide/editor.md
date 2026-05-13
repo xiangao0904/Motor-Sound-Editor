@@ -1,6 +1,6 @@
 ﻿---
 title: Editor Workspace
-description: Understand the editor's main regions and interaction model.
+description: Understand the Motor Sound Editor workspace for BVE motor sound editing, including tools, track layers, curve graphs, and live preview controls.
 ---
 
 # Editor Workspace
@@ -20,7 +20,7 @@ The workspace is divided into four main regions:
 
 The top toolbar contains the global controls that affect how you interact with the workspace.
 
-![Tools](/docs/tools.png)
+![Annotated Motor Sound Editor toolbar](/docs/tools.png)
 
 - **Tool Mode** decides how you interact with curves and keyframes.
   - **Select** is the default mode for choosing keyframes.

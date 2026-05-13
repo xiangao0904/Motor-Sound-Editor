@@ -1,6 +1,6 @@
 ﻿---
 title: 背景故事
-description: Motor Sound Editor的背后故事
+description: 阅读 Motor Sound Editor 的开发历程，了解它如何从早期原型成长为现代化的 BVE 列车音效编辑器。
 ---
 # 这个软件是怎么折腾出来的
 
@@ -41,7 +41,7 @@ Tauri 最吸引我的一点是，它可以直接用前端的技术来写界面�
 
 另外还得提一嘴现在 AI Coding Agent 的发达。有了 AI 的辅助，以前那些让我觉得头疼、实现起来很麻烦的逻辑，现在都能很顺畅地解决。可以说，如果没有现在这么强大的 Coding Agent，这个项目这次大抵还是做不出来的。
 
-![最终](/editpage.png)
+![Motor Sound Editor v0.0.1 最终界面](/editpage.png)
 <p style="text-align:center">软件v0.0.1</p>
 
 做这个工具的初衷只是想让自己做音效时少受点罪，现在它终于完成了。如果你也和我一样，曾经被手搓 CSV 折磨过，希望这个小工具能帮你省下一些时间。另外，如果你平时也喜欢自己写点跨平台的小软件，Tauri 确实值得认真试一试。

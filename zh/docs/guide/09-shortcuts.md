@@ -1,6 +1,6 @@
 ﻿---
 title: 快捷键
-description: 日常编辑常用键盘快捷键与交互约定。
+description: 查阅可加速日常电机音效编辑的键盘快捷键与交互约定，提升 Motor Sound Editor 工作效率。
 ---
 
 # 快捷键

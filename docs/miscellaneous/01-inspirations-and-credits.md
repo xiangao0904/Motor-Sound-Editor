@@ -2,7 +2,7 @@
 
 title: Inspiration and Credits
 
-description: Software referenced during the construction of this project
+description: See the tools, editors, and references that influenced Motor Sound Editor and its train sound authoring workflow.
 
 ---
 

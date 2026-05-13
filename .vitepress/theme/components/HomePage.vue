@@ -30,7 +30,7 @@ function resolveSitePath(path: string) {
   <main class="mse-home" :class="{ 'mse-home--zh': isChinese }">
     <nav class="mse-nav" :aria-label="content.navAriaLabel">
       <a class="mse-brand" href="#top" :aria-label="content.homeAriaLabel">
-        <img class="mse-brand__mark" :src="logoSrc" alt="" />
+        <img class="mse-brand__mark" :src="logoSrc" alt="" aria-hidden="true" />
         <span>Motor Sound Editor</span>
       </a>
       <div class="mse-nav__links" :aria-label="content.sectionLinksAriaLabel">
@@ -46,8 +46,8 @@ function resolveSitePath(path: string) {
 
     <section id="top" class="mse-hero" aria-labelledby="hero-title">
       <div class="mse-hero__backdrop" aria-hidden="true">
-        <img class="mse-brand-glow mse-brand-glow--left" :src="logoSrc" alt="" />
-        <img class="mse-brand-glow mse-brand-glow--right" :src="logoSrc" alt="" />
+        <img class="mse-brand-glow mse-brand-glow--left" :src="logoSrc" alt="" aria-hidden="true" />
+        <img class="mse-brand-glow mse-brand-glow--right" :src="logoSrc" alt="" aria-hidden="true" />
         <span class="mse-rail mse-rail--one"></span>
         <span class="mse-rail mse-rail--two"></span>
       </div>
@@ -81,7 +81,7 @@ function resolveSitePath(path: string) {
             <div class="mse-product-frame__topbar">
               <div aria-hidden="true"><span></span><span></span><span></span></div>
               <div class="mse-brand-lockup mse-brand-lockup--frame">
-                <img class="mse-brand-lockup__mark" :src="logoSrc" alt="" />
+                <img class="mse-brand-lockup__mark" :src="logoSrc" alt="" aria-hidden="true" />
                 <span class="mse-brand-lockup__text">
                   <strong>Motor Sound Editor</strong>
                   <small>{{ content.brandSubline }}</small>

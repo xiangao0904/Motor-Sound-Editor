@@ -1,6 +1,6 @@
 ﻿---
 title: 快速开始
-description: Motor Sound Editor 用户首次使用指南。
+description: 安装 Motor Sound Editor，创建首个 BVE 或 openBVE 电机音效项目，并完成试听与导出。
 ---
 
 # 快速开始
@@ -76,7 +76,7 @@ Motor Sound Editor 面向希望在可视化编辑器中创作分层电机音效�
 
 ### 第六步：导出 BVE 压缩包
 
-![导出](/docs/output.png)
+![Motor Sound Editor 中的 BVE 导出产物预览](/docs/output.png)
 
 1. 点击工具栏或菜单中的 **Export**。
 2. 在弹出的对话框中选择 **BVE**。

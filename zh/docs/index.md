@@ -1,11 +1,11 @@
 ﻿---
 title: 文档
-description: Motor Sound Editor 的用户手册与教程。
+description: 查阅 Motor Sound Editor 文档，了解 BVE 与 openBVE 电机音效编辑、列车音效项目创建、实时试听与导出流程。
 ---
 
 # 用户文档
 
-Motor Sound Editor 是一款专注于电机音效工程的桌面编辑器，支持可视化曲线编辑、按轨道分层分配音频、实时试听与导出打包。本文档面向希望稳定完成创建、编辑、校对和导出的终端用户。
+Motor Sound Editor 是一款面向 BVE 与 openBVE 电机音效工程的桌面编辑器，支持可视化曲线编辑、按轨道分层分配音频、实时试听与导出打包。本文档面向希望稳定完成列车音效项目创建、编辑、校对和导出的终端用户。
 
 <div class="docs-grid">
   <article class="docs-card">
@@ -33,4 +33,3 @@ Motor Sound Editor 是一款专注于电机音效工程的桌面编辑器，支�
     <a href="./guide/export">打开手册</a>
   </article>
 </div>
-

@@ -1,6 +1,6 @@
 ﻿---
 title: Project Details and Save
-description: Review project metadata, statistics, save behavior, and history controls.
+description: Review project metadata, statistics, save behavior, and project history controls inside Motor Sound Editor.
 ---
 
 # Project Details and Save
