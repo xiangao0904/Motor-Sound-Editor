@@ -31,11 +31,17 @@
   <text key="home.create">Create</text>
   <text key="home.onlyMsepOpen">Only .msep projects can be opened</text>
   <text key="home.onlyMsepImport">Only .msep projects can be imported</text>
+  <text key="home.onlySupportedImport">Only .msep, vehicle.txt, or sound.cfg files can be imported</text>
   <text key="home.projectCreatedFailed">Project could not be created</text>
   <text key="home.projectOpenFailed">Project could not be opened</text>
   <text key="home.projectImportFailed">Project could not be imported</text>
   <text key="home.projectImported">Project imported</text>
   <text key="home.projectsImported">projects imported</text>
+  <text key="home.externalProjectImported">Project imported and saved as .msep</text>
+  <text key="home.importSourceIncomplete">Import source is incomplete:</text>
+  <text key="home.importMissingFile">Missing required file:</text>
+  <text key="home.importInvalidCsv">Invalid CSV file:</text>
+  <text key="home.importMissingAudio">Missing audio:</text>
   <text key="home.exportLoadFailed">Project could not be loaded for export</text>
   <text key="home.removed">removed</text>
   <text key="settings.title">Settings</text>

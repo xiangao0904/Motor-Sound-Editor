@@ -11,9 +11,15 @@ import {
   ensureMsepExtension,
   isMsepPath,
   openMsepProject,
+  projectNameFromPath,
   readFileModifiedAt,
   saveMsepProject,
 } from "@/services/msepProject";
+import {
+  importExternalProject,
+  isExternalImportPath,
+  ProjectImportError,
+} from "@/services/projectImport";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useI18nStore } from "@/stores/i18n";
 import { useProjectStore } from "@/stores/project";
@@ -233,11 +239,6 @@ async function openProjectPath(filePath: string) {
 }
 
 async function importProjectPath(filePath: string): Promise<boolean> {
-  if (!isMsepPath(filePath)) {
-    showToast(i18n.t("home.onlyMsepImport"));
-    return false;
-  }
-
   try {
     const loaded = await openMsepProject(filePath);
     recentProjectsStore.upsertProject({
@@ -246,6 +247,7 @@ async function importProjectPath(filePath: string): Promise<boolean> {
       lastModified: await readFileModifiedAt(filePath),
       ...(await createProjectPreview(loaded.document)),
     });
+    showToast(i18n.t("home.projectImported"));
     return true;
   } catch (error) {
     console.error("Project import failed", error);
@@ -254,20 +256,102 @@ async function importProjectPath(filePath: string): Promise<boolean> {
   }
 }
 
+function isSupportedImportPath(filePath: string): boolean {
+  return isMsepPath(filePath) || isExternalImportPath(filePath);
+}
+
+function formatProjectImportError(error: unknown): string {
+  if (!(error instanceof ProjectImportError)) {
+    return i18n.t("home.projectImportFailed");
+  }
+
+  switch (error.code) {
+    case "unsupported-entry":
+      return i18n.t("home.onlySupportedImport");
+    case "missing-file":
+      return `${i18n.t("home.importMissingFile")} ${error.detail ?? ""}`.trim();
+    case "invalid-config":
+      return `${i18n.t("home.importSourceIncomplete")} ${error.detail ?? ""}`.trim();
+    case "invalid-csv":
+      return `${i18n.t("home.importInvalidCsv")} ${error.detail ?? ""}`.trim();
+    default:
+      return i18n.t("home.projectImportFailed");
+  }
+}
+
+function buildExternalImportSuccessMessage(warnings: string[]): string {
+  const success = i18n.t("home.externalProjectImported");
+  if (warnings.length === 0) {
+    return success;
+  }
+
+  return `${success} ${i18n.t("home.importMissingAudio")} ${warnings.join(", ")}`;
+}
+
+async function importExternalProjectPath(filePath: string): Promise<boolean> {
+  try {
+    const imported = await importExternalProject(filePath);
+    const selected = await save({
+      title: "Save Imported MSEP Project",
+      defaultPath: `${imported.defaultProjectName}.msep`,
+      filters: [{ name: "MSEP Project", extensions: ["msep"] }],
+    });
+
+    if (!selected) {
+      return false;
+    }
+
+    const savePath = ensureMsepExtension(selected);
+    const document = structuredClone(imported.document);
+    document.project.meta.name =
+      projectNameFromPath(savePath) || imported.defaultProjectName;
+    document.project.meta.updatedAt = new Date().toISOString();
+
+    await saveMsepProject(document, savePath, imported.assetPayloads);
+    recentProjectsStore.upsertProject({
+      name: document.project.meta.name,
+      filePath: savePath,
+      lastModified: await readFileModifiedAt(savePath),
+      ...(await createProjectPreview(document)),
+    });
+    showToast(buildExternalImportSuccessMessage(imported.warnings));
+    return true;
+  } catch (error) {
+    console.error("External project import failed", error);
+    showToast(formatProjectImportError(error));
+    return false;
+  }
+}
+
+async function importAnyProjectPath(filePath: string): Promise<boolean> {
+  if (isMsepPath(filePath)) {
+    return importProjectPath(filePath);
+  }
+
+  if (isExternalImportPath(filePath)) {
+    return importExternalProjectPath(filePath);
+  }
+
+  showToast(i18n.t("home.onlySupportedImport"));
+  return false;
+}
+
 async function browseImportFile() {
   closeContextMenu();
 
   const selected = await open({
     multiple: false,
     directory: false,
-    filters: [{ name: "MSEP Project", extensions: ["msep"] }],
+    filters: [
+      { name: "Supported Import Files", extensions: ["msep", "txt", "cfg"] },
+      { name: "MSEP Project", extensions: ["msep"] },
+      { name: "BVE Vehicle", extensions: ["txt"] },
+      { name: "MTR Sound Config", extensions: ["cfg"] },
+    ],
   });
 
   if (typeof selected !== "string") return;
-
-  if (await importProjectPath(selected)) {
-    showToast(i18n.t("home.projectImported"));
-  }
+  await importAnyProjectPath(selected);
 }
 
 function openProject(project: ProjectCardItem) {
@@ -345,25 +429,14 @@ onMounted(async () => {
       async (event) => {
         if (event.payload.type !== "drop") return;
 
-        const msepPaths = event.payload.paths.filter(isMsepPath);
-        if (msepPaths.length === 0) {
-          showToast(i18n.t("home.onlyMsepImport"));
+        const importPaths = event.payload.paths.filter(isSupportedImportPath);
+        if (importPaths.length === 0) {
+          showToast(i18n.t("home.onlySupportedImport"));
           return;
         }
 
-        let importedCount = 0;
-        for (const path of msepPaths) {
-          if (await importProjectPath(path)) {
-            importedCount += 1;
-          }
-        }
-
-        if (importedCount > 0) {
-          showToast(
-            importedCount === 1
-              ? i18n.t("home.projectImported")
-              : `${importedCount} ${i18n.t("home.projectsImported")}`,
-          );
+        for (const path of importPaths) {
+          await importAnyProjectPath(path);
         }
       },
     );

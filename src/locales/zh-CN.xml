@@ -110,4 +110,10 @@
   <text key="app.undoApplied">已撤销</text>
   <text key="app.nothingRedo">没有可重做操作</text>
   <text key="app.redoApplied">已重做</text>
+  <text key="home.onlySupportedImport">只能导入 .msep、vehicle.txt 或 sound.cfg 文件</text>
+  <text key="home.externalProjectImported">工程已导入并生成 .msep</text>
+  <text key="home.importSourceIncomplete">导入源文件不完整：</text>
+  <text key="home.importMissingFile">缺少必要文件：</text>
+  <text key="home.importInvalidCsv">CSV 文件格式有误：</text>
+  <text key="home.importMissingAudio">缺少音频：</text>
 </locale>
