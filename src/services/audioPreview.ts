@@ -1,11 +1,14 @@
 import type { AudioAsset, CurveSetKind, Track } from "@/types/track";
 import { sampleCurve } from "@/utils/curves";
 
+const AUDIO_PARAM_SMOOTHING_TIME = 0.05;
+const AUDIO_PARAM_TARGET_EPSILON = 0.0001;
+
 interface PlayingTrack {
   source: AudioBufferSourceNode;
   gain: GainNode;
-  currentPitch: number;
-  currentGain: number;
+  targetPitch: number;
+  targetGain: number;
 }
 
 export class AudioPreviewEngine {
@@ -90,16 +93,16 @@ export class AudioPreviewEngine {
 
         source.buffer = buffer;
         source.loop = true;
-        source.playbackRate.setValueAtTime(pitch, now);
-        gain.gain.setValueAtTime(volume, now);
+        this.setImmediateValue(source.playbackRate, pitch, now);
+        this.setImmediateValue(gain.gain, volume, now);
         source.connect(gain);
         gain.connect(context.destination);
         source.start();
         this.playing.set(track.id, {
           source,
           gain,
-          currentPitch: pitch,
-          currentGain: volume,
+          targetPitch: pitch,
+          targetGain: volume,
         });
       } catch {
         warnings.push(`${track.name} audio could not be decoded`);
@@ -129,17 +132,18 @@ export class AudioPreviewEngine {
           : 0,
       );
 
-      if (Math.abs(nodes.currentPitch - pitch) > 0.0001) {
-        nodes.source.playbackRate.cancelScheduledValues(now);
-        nodes.source.playbackRate.setTargetAtTime(pitch, now, 0.03);
-        nodes.currentPitch = pitch;
-      }
-
-      if (Math.abs(nodes.currentGain - volume) > 0.0001) {
-        nodes.gain.gain.cancelScheduledValues(now);
-        nodes.gain.gain.setTargetAtTime(volume, now, 0.03);
-        nodes.currentGain = volume;
-      }
+      nodes.targetPitch = this.scheduleSmoothedValue(
+        nodes.source.playbackRate,
+        nodes.targetPitch,
+        pitch,
+        now,
+      );
+      nodes.targetGain = this.scheduleSmoothedValue(
+        nodes.gain.gain,
+        nodes.targetGain,
+        volume,
+        now,
+      );
     });
   }
 
@@ -171,6 +175,28 @@ export class AudioPreviewEngine {
     }
 
     return this.context;
+  }
+
+  private setImmediateValue(param: AudioParam, value: number, atTime: number) {
+    param.cancelScheduledValues(atTime);
+    param.setValueAtTime(value, atTime);
+  }
+
+  private scheduleSmoothedValue(
+    param: AudioParam,
+    previousTarget: number,
+    nextTarget: number,
+    atTime: number,
+  ): number {
+    if (Math.abs(previousTarget - nextTarget) <= AUDIO_PARAM_TARGET_EPSILON) {
+      return previousTarget;
+    }
+
+    const currentValue = param.value;
+    param.cancelScheduledValues(atTime);
+    param.setValueAtTime(currentValue, atTime);
+    param.setTargetAtTime(nextTarget, atTime, AUDIO_PARAM_SMOOTHING_TIME);
+    return nextTarget;
   }
 
   private filterAudibleTracks(tracks: Track[]): Track[] {
