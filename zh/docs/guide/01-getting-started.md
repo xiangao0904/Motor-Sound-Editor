@@ -17,15 +17,15 @@ Motor Sound Editor 面向希望在可视化编辑器中创作分层电机音效�
 
 ### 下载与安装
 
-- **获取软件**：你可以直接通过[这个链接](https://github.com/xiangao0904/Motor-Sound-Editor/releases)下载当前 Windows 安装程序。
+- **获取软件**：你可以直接通过[这个链接](https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases)下载当前 Windows 安装程序。
 - **快速安装**：下载完成后，运行安装程序即可。无需额外安装运行库，Tauri 所需组件已随应用打包。
 
 ### 示例文件
 
 如果你想先拿现成的 `.msep` 工程熟悉编辑器，可以直接下载这些示例：
 
-- [caf_train_sound.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep) — 贡献者：K.L1
-- [class323.msep](https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep) — 贡献者：LX9702
+- [caf_train_sound.msep](https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep) — 贡献者：K.L1
+- [class323.msep](https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep) — 贡献者：LX9702
 
 ### 数据与素材
 

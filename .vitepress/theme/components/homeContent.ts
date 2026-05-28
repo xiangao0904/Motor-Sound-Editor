@@ -94,7 +94,7 @@ export interface HomeContent {
 }
 
 const installerUrl =
-  "https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.1.1/Motor.Sound.Editor_1.1.1_x64-setup.exe";
+  "https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.1.1/Motor.Sound.Editor_1.1.1_x64-setup.exe";
 const featureIcons = {
   curve: "M4 18C7.5 8.8 10.5 20 14 11.5C16 6.5 18.5 5.6 21 7.2M5 18h16M4 4.5v15",
   preview: "M4 12h3l2.2-5 4.6 11 3-7H21M5 20h14M5 4h14",
