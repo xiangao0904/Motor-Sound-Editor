@@ -4,7 +4,7 @@ use tauri::{Emitter, Manager};
 
 use native::{
     export_bve_project, export_mtr_project, msep_path_from_args, open_msep_file, pack_msep_file,
-    read_audio_metadata_batch, read_msep_file, read_msep_modified_at,
+    read_audio_metadata_batch, read_external_file, read_msep_file, read_msep_modified_at,
     register_msep_file_association, sample_curves_batch, startup_msep_path, write_msep_file,
 };
 
@@ -28,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             read_msep_file,
+            read_external_file,
             write_msep_file,
             read_msep_modified_at,
             startup_msep_path,

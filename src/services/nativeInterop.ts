@@ -88,6 +88,11 @@ export async function openNativeMsepProject(
   return invoke<LoadedNativeProject>("open_msep_file", { path });
 }
 
+export async function readExternalFile(path: string): Promise<Uint8Array> {
+  const bytes = await invoke<number[]>("read_external_file", { path });
+  return new Uint8Array(bytes);
+}
+
 export async function readAudioMetadataBatch(
   items: AudioMetadataSource[],
 ): Promise<AudioMetadataResult[]> {

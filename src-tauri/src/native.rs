@@ -1086,6 +1086,11 @@ pub fn read_msep_file(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+pub fn read_external_file(path: String) -> Result<Vec<u8>, String> {
+    fs::read(path).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn write_msep_file(path: String, bytes: Vec<u8>) -> Result<(), String> {
     ensure_msep_path(&path)?;
     fs::write(path, bytes).map_err(|error| error.to_string())
