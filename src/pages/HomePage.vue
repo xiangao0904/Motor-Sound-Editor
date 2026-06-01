@@ -54,6 +54,25 @@ const exportAssetPayloads = ref(new Map<string, Uint8Array>());
 const toast = ref("");
 let unlistenDragDrop: (() => void) | null = null;
 
+async function refreshRecentProjectPreview(
+  filePath: string,
+  name: string,
+  lastModified: string,
+  document: ProjectDocument,
+) {
+  try {
+    recentProjectsStore.upsertProject({
+      name,
+      filePath,
+      lastModified,
+      previewReady: true,
+      ...(await createProjectPreview(document)),
+    });
+  } catch (error) {
+    console.error("Project preview refresh failed", error);
+  }
+}
+
 const newProject = reactive({
   name: "",
   maxSpeed: 120,
@@ -89,17 +108,6 @@ const contextProject = computed(
       (project) => project.id === contextProjectId.value,
     ) ?? null,
 );
-
-function linePoints(values: number[]): string {
-  const maxIndex = values.length - 1;
-
-  return values
-    .map((value, index) => {
-      const x = maxIndex === 0 ? 0 : (index / maxIndex) * 100;
-      return `${x.toFixed(1)},${value.toFixed(1)}`;
-    })
-    .join(" ");
-}
 
 function formatProjectTime(value: string): string {
   const date = new Date(value);
@@ -178,12 +186,12 @@ async function createProject() {
 
     await saveMsepProject(document, filePath, assetPayloadStore.payloads);
     projectStore.markSaved(filePath);
-    recentProjectsStore.upsertProject({
-      name,
+    await refreshRecentProjectPreview(
       filePath,
-      lastModified: await readFileModifiedAt(filePath),
-      ...(await createProjectPreview(document)),
-    });
+      name,
+      await readFileModifiedAt(filePath),
+      document,
+    );
 
     newProject.name = "";
     newProject.maxSpeed = 120;
@@ -225,13 +233,23 @@ async function openProjectPath(filePath: string) {
       assetPayloadStore.setPayload(assetId, bytes);
     });
 
+    const lastModified = await readFileModifiedAt(filePath);
+    const existingProject = recentProjectsStore.findByFilePath(filePath);
     recentProjectsStore.upsertProject({
       name: loaded.document.project.meta.name,
       filePath,
-      lastModified: await readFileModifiedAt(filePath),
-      ...(await createProjectPreview(loaded.document)),
+      lastModified,
     });
     emit("open-editor");
+
+    if (!existingProject?.previewReady) {
+      void refreshRecentProjectPreview(
+        filePath,
+        loaded.document.project.meta.name,
+        lastModified,
+        loaded.document,
+      );
+    }
   } catch (error) {
     console.error("Project open failed", error);
     showToast(i18n.t("home.projectOpenFailed"));
@@ -241,12 +259,21 @@ async function openProjectPath(filePath: string) {
 async function importProjectPath(filePath: string): Promise<boolean> {
   try {
     const loaded = await openMsepProject(filePath);
+    const existingProject = recentProjectsStore.findByFilePath(filePath);
+    const lastModified = await readFileModifiedAt(filePath);
     recentProjectsStore.upsertProject({
       name: loaded.document.project.meta.name,
       filePath,
-      lastModified: await readFileModifiedAt(filePath),
-      ...(await createProjectPreview(loaded.document)),
+      lastModified,
     });
+    if (!existingProject?.previewReady) {
+      void refreshRecentProjectPreview(
+        filePath,
+        loaded.document.project.meta.name,
+        lastModified,
+        loaded.document,
+      );
+    }
     showToast(i18n.t("home.projectImported"));
     return true;
   } catch (error) {
@@ -308,12 +335,12 @@ async function importExternalProjectPath(filePath: string): Promise<boolean> {
     document.project.meta.updatedAt = new Date().toISOString();
 
     await saveMsepProject(document, savePath, imported.assetPayloads);
-    recentProjectsStore.upsertProject({
-      name: document.project.meta.name,
-      filePath: savePath,
-      lastModified: await readFileModifiedAt(savePath),
-      ...(await createProjectPreview(document)),
-    });
+    await refreshRecentProjectPreview(
+      savePath,
+      document.project.meta.name,
+      await readFileModifiedAt(savePath),
+      document,
+    );
     showToast(buildExternalImportSuccessMessage(imported.warnings));
     return true;
   } catch (error) {
@@ -565,7 +592,7 @@ onBeforeUnmount(() => {
                   v-for="line in project.previewLines ?? []"
                   :key="`${project.id}-${line.trackId}`"
                   class="preview-line"
-                  :points="linePoints(line.points)"
+                  :points="line.pointsText ?? ''"
                   :style="{ stroke: line.color }"
                 />
               </svg>
@@ -957,6 +984,7 @@ onBeforeUnmount(() => {
 .project-card {
   display: flex;
   flex-direction: column;
+  contain: layout paint;
   height: 254px;
   padding: 16px 17px 14px;
   background: linear-gradient(
@@ -1010,7 +1038,6 @@ onBeforeUnmount(() => {
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.22));
 }
 
 .project-card h2 {

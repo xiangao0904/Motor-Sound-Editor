@@ -4,15 +4,27 @@ import type { ProjectDocument, ProjectPreviewLine } from "@/types/project";
 import type { TrackCurve } from "@/types/track";
 import { sampleCurve } from "@/utils/curves";
 
-function curvePreview(curve: TrackCurve, maxSpeed: number): number[] {
-  const points = 9;
+const PREVIEW_POINT_COUNT = 9;
+const MAX_PREVIEW_TRACKS = 6;
 
-  return Array.from({ length: points }, (_, index) => {
-    const speed = (maxSpeed / (points - 1)) * index;
+function curvePreview(curve: TrackCurve, maxSpeed: number): number[] {
+  return Array.from({ length: PREVIEW_POINT_COUNT }, (_, index) => {
+    const speed = (maxSpeed / (PREVIEW_POINT_COUNT - 1)) * index;
     const value = sampleCurve(curve, speed);
     const normalized = Math.max(0, Math.min(value / CURVE_MAX_VALUE[curve.kind], 1));
     return 92 - normalized * 72;
   });
+}
+
+function pointsToPolylineText(values: number[]): string {
+  const maxIndex = values.length - 1;
+
+  return values
+    .map((value, index) => {
+      const x = maxIndex === 0 ? 0 : (index / maxIndex) * 100;
+      return `${x.toFixed(1)},${value.toFixed(1)}`;
+    })
+    .join(" ");
 }
 
 function createPreviewLine(
@@ -20,13 +32,20 @@ function createPreviewLine(
   color: string,
   points: number[],
 ): ProjectPreviewLine {
-  return { trackId, color, points };
+  return { trackId, color, points, pointsText: pointsToPolylineText(points) };
+}
+
+function selectPreviewTracks(document: ProjectDocument) {
+  return document.tracks.tracks.slice(0, MAX_PREVIEW_TRACKS);
 }
 
 export async function createProjectPreview(document: ProjectDocument) {
-  const tracks = document.tracks.tracks;
+  const tracks = selectPreviewTracks(document);
   const maxSpeed = document.project.meta.maxSpeed || 1;
-  const speeds = Array.from({ length: 9 }, (_, index) => (maxSpeed / 8) * index);
+  const speeds = Array.from(
+    { length: PREVIEW_POINT_COUNT },
+    (_, index) => (maxSpeed / (PREVIEW_POINT_COUNT - 1)) * index,
+  );
 
   if (tracks.length === 0) {
     return {

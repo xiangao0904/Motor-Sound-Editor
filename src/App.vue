@@ -15,6 +15,7 @@ import {
   restoreDocumentObjectUrls,
   saveMsepProject,
 } from "@/services/msepProject";
+import type { ProjectDocument } from "@/types/project";
 import { useAssetPayloadStore } from "@/stores/assetPayloads";
 import { useEditorStore } from "@/stores/editor";
 import { useHistoryStore } from "@/stores/history";
@@ -44,6 +45,25 @@ let allowNextClose = false;
 let skipNextBeforeUnload = false;
 let unlistenCloseRequested: (() => void) | null = null;
 let unlistenMsepOpenRequested: (() => void) | null = null;
+
+async function refreshRecentProjectPreview(
+  filePath: string,
+  name: string,
+  lastModified: string,
+  document: ProjectDocument,
+) {
+  try {
+    recentProjectsStore.upsertProject({
+      name,
+      filePath,
+      lastModified,
+      previewReady: true,
+      ...(await createProjectPreview(document)),
+    });
+  } catch (error) {
+    console.error("Project preview refresh failed", error);
+  }
+}
 
 function openEditor() {
   const meta = projectStore.meta;
@@ -100,12 +120,13 @@ async function persistProject(saveAs = false) {
   try {
     await saveMsepProject(document, filePath, assetPayloadStore.payloads);
     projectStore.markSaved(filePath);
-    recentProjectsStore.upsertProject({
-      name: document.project.meta.name,
+    const lastModified = await readFileModifiedAt(filePath);
+    await refreshRecentProjectPreview(
       filePath,
-      lastModified: await readFileModifiedAt(filePath),
-        ...(await createProjectPreview(document)),
-    });
+      document.project.meta.name,
+      lastModified,
+      document,
+    );
     notificationStore.showToast(i18n.t("app.projectSaved"));
     return true;
   } catch (error) {
@@ -129,13 +150,23 @@ async function openProjectPath(filePath: string) {
       assetPayloadStore.setPayload(assetId, bytes);
     });
 
+    const lastModified = await readFileModifiedAt(filePath);
+    const existingProject = recentProjectsStore.findByFilePath(filePath);
     recentProjectsStore.upsertProject({
       name: loaded.document.project.meta.name,
       filePath,
-      lastModified: await readFileModifiedAt(filePath),
-        ...(await createProjectPreview(loaded.document)),
+      lastModified,
     });
     openEditor();
+
+    if (!existingProject?.previewReady) {
+      void refreshRecentProjectPreview(
+        filePath,
+        loaded.document.project.meta.name,
+        lastModified,
+        loaded.document,
+      );
+    }
   } catch (error) {
     console.error("Project open failed", error);
     notificationStore.showToast(i18n.t("app.projectOpenFailed"));

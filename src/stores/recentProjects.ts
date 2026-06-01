@@ -23,6 +23,10 @@ function readStoredProjects(): ProjectCardItem[] {
       )
       .map((item) => ({
         ...item,
+        previewReady:
+          typeof item.previewReady === "boolean"
+            ? item.previewReady
+            : Array.isArray(item.previewLines),
         previewLines: Array.isArray(item.previewLines)
           ? item.previewLines
               .filter(
@@ -38,6 +42,8 @@ function readStoredProjects(): ProjectCardItem[] {
                 points: line.points
                   .filter((value): value is number => typeof value === "number")
                   .map((value) => Number(value)),
+                pointsText:
+                  typeof line.pointsText === "string" ? line.pointsText : undefined,
               }))
           : [],
       }));
@@ -63,13 +69,31 @@ export const useRecentProjectsStore = defineStore("recentProjects", () => {
 
   function upsertProject(project: Omit<ProjectCardItem, "id"> & { id?: string }) {
     const id = project.id ?? project.filePath;
+    const existing =
+      projects.value.find((item) => item.filePath === project.filePath) ?? null;
     const nextProject: ProjectCardItem = {
       id,
       name: project.name,
       filePath: project.filePath,
       lastModified: project.lastModified,
-      previewImagePath: project.previewImagePath,
-      previewLines: project.previewLines ?? [],
+      previewReady:
+        project.previewReady ??
+        (project.previewLines !== undefined
+          ? true
+          : existing?.previewReady ?? false),
+      previewImagePath: project.previewImagePath ?? existing?.previewImagePath,
+      previewLines: (project.previewLines ?? existing?.previewLines ?? []).map((line) => ({
+        ...line,
+        pointsText:
+          line.pointsText ??
+          line.points
+            .map((value, index, values) => {
+              const maxIndex = values.length - 1;
+              const x = maxIndex === 0 ? 0 : (index / maxIndex) * 100;
+              return `${x.toFixed(1)},${value.toFixed(1)}`;
+            })
+            .join(" "),
+      })),
     };
 
     projects.value = [
@@ -77,6 +101,10 @@ export const useRecentProjectsStore = defineStore("recentProjects", () => {
       ...projects.value.filter((item) => item.filePath !== project.filePath),
     ];
     persist();
+  }
+
+  function findByFilePath(filePath: string) {
+    return projects.value.find((project) => project.filePath === filePath) ?? null;
   }
 
   function removeProject(projectId: string) {
@@ -88,6 +116,7 @@ export const useRecentProjectsStore = defineStore("recentProjects", () => {
     projects,
     sortedByDate,
     upsertProject,
+    findByFilePath,
     removeProject,
   };
 });
