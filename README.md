@@ -3,7 +3,6 @@
 [![Version](https://img.shields.io/github/v/release/xiangao0904/Motor-Sound-Editor?label=version&style=flat-square&color=0078d4&logo=github)](https://github.com/xiangao0904/Motor-Sound-Editor/releases)
 ![Platform](https://img.shields.io/badge/platform-Windows-brightgreen)
 ![Tech Stack](https://img.shields.io/badge/stack-Vue3%20|%20Tauri%20|%20Rust-orange)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/9NDnk3VSsZ)
 
 **Motor Sound Editor** is a professional desktop-first editor designed specifically for BVE-style train content creation. It liberates creators from the tedious task of manually editing raw CSV tables by providing a visual, high-efficiency workflow for building, previewing, and exporting motor sound projects.
 
