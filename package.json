@@ -4,9 +4,13 @@
   "version": "1.2.0",
   "type": "module",
   "scripts": {
+    "version:sync": "node scripts/sync-version.mjs",
+    "predev": "pnpm version:sync",
     "dev": "vite",
+    "prebuild": "pnpm version:sync",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "pretauri": "pnpm version:sync",
     "tauri": "tauri",
     "site:dev": "pnpm --dir website dev",
     "site:build": "pnpm --dir website build",
