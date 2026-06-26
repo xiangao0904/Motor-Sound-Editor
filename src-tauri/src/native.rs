@@ -208,10 +208,10 @@ enum EncodedTrackMode {
 }
 
 #[derive(Debug, Clone)]
-struct ExportableTrack {
-    track: Track,
-    asset: AudioAsset,
-    bytes: Vec<u8>,
+struct ExportableTrack<'a> {
+    track: &'a Track,
+    asset: &'a AudioAsset,
+    bytes: &'a Vec<u8>,
 }
 
 impl Track {
@@ -720,7 +720,7 @@ fn encode_audio(decoded: &DecodedAudio, format: EncodedAudioFormat) -> Result<Ve
 }
 
 fn collect_speeds(
-    tracks: &[ExportableTrack],
+    tracks: &[ExportableTrack<'_>],
     curve_set: CurveSetKind,
     kind: CurveKind,
 ) -> Vec<f64> {
@@ -752,7 +752,7 @@ fn collect_speeds(
 }
 
 fn create_motor_noise_csv(
-    tracks: &[ExportableTrack],
+    tracks: &[ExportableTrack<'_>],
     curve_set: CurveSetKind,
     kind: CurveKind,
 ) -> Result<String, String> {
@@ -783,7 +783,7 @@ fn write_motor_noise_csv_files(
     zip: &mut ZipWriter<Cursor<Vec<u8>>>,
     options_zip: FileOptions,
     base_path: &str,
-    tracks: &[ExportableTrack],
+    tracks: &[ExportableTrack<'_>],
 ) -> Result<(), String> {
     for (path, curve_set, kind) in [
         (
@@ -817,7 +817,7 @@ fn write_motor_noise_csv_files(
 }
 
 fn encode_track_bytes(
-    track: &ExportableTrack,
+    track: &ExportableTrack<'_>,
     sample_rate: u32,
     mode: EncodedTrackMode,
 ) -> Result<Vec<u8>, String> {
@@ -837,16 +837,15 @@ fn encode_track_bytes(
     }
 }
 
-fn exportable_tracks(
-    document: &ProjectDocument,
-    asset_payloads: &HashMap<String, Vec<u8>>,
-) -> Vec<ExportableTrack> {
+fn exportable_tracks<'a>(
+    document: &'a ProjectDocument,
+    asset_payloads: &'a HashMap<String, Vec<u8>>,
+) -> Vec<ExportableTrack<'a>> {
     let asset_by_id = document
         .tracks
         .assets
         .iter()
-        .cloned()
-        .map(|asset| (asset.id.clone(), asset))
+        .map(|asset| (asset.id.as_str(), asset))
         .collect::<HashMap<_, _>>();
 
     document
@@ -856,10 +855,10 @@ fn exportable_tracks(
         .filter(|track| track.enabled && !track.mute)
         .filter_map(|track| {
             let asset_id = track.asset_id.as_ref()?;
-            let asset = asset_by_id.get(asset_id)?.clone();
-            let bytes = asset_payloads.get(asset_id)?.clone();
+            let asset = *asset_by_id.get(asset_id.as_str())?;
+            let bytes = asset_payloads.get(asset_id)?;
             Some(ExportableTrack {
-                track: track.clone(),
+                track,
                 asset,
                 bytes,
             })

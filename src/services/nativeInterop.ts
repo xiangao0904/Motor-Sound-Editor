@@ -6,6 +6,7 @@ import type { CurveSetKind, Track } from "@/types/track";
 import { sanitizeProjectDocument } from "@/utils/clone";
 
 type RawPayloadRecord = Record<string, number[]>;
+type IpcPayloadRecord = Record<string, Uint8Array>;
 
 export interface LoadedNativeProject {
   document: ProjectDocument;
@@ -53,10 +54,8 @@ export type NativeExportOptions =
 
 export function serializePayloadMap(
   assetPayloads: Map<ID, Uint8Array>,
-): RawPayloadRecord {
-  return Object.fromEntries(
-    [...assetPayloads.entries()].map(([assetId, bytes]) => [assetId, Array.from(bytes)]),
-  );
+): IpcPayloadRecord {
+  return Object.fromEntries(assetPayloads.entries());
 }
 
 export function deserializePayloadRecord(
