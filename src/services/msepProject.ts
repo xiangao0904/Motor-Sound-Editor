@@ -8,6 +8,7 @@ import {
   openNativeMsepProject,
   saveNativeMsepProject,
 } from "@/services/nativeInterop";
+import { measureAsync } from "@/utils/perfTrace";
 
 export interface LoadedMsepProject {
   document: ProjectDocument;
@@ -93,21 +94,28 @@ export async function saveMsepProject(
   filePath: string,
   assetPayloads: Map<ID, Uint8Array>,
 ): Promise<void> {
-  await saveNativeMsepProject(filePath, document, assetPayloads);
+  await measureAsync("save .msep", () =>
+    saveNativeMsepProject(filePath, document, assetPayloads),
+  );
 }
 
 export async function openMsepProject(filePath: string): Promise<LoadedMsepProject> {
-  const loaded = await openNativeMsepProject(filePath);
-  const assetPayloads = deserializePayloadRecord(loaded.assetPayloads);
-  loaded.document.tracks.assets.forEach((asset) => {
-    const bytes = assetPayloads.get(asset.id);
-    if (bytes) {
-      asset.objectUrl = createObjectUrl(bytes, asset);
-    }
+  const loaded = await measureAsync("open .msep native", () =>
+    openNativeMsepProject(filePath),
+  );
+  const assetPayloads = measureAsync("restore .msep assets", async () => {
+    const payloads = deserializePayloadRecord(loaded.assetPayloads);
+    loaded.document.tracks.assets.forEach((asset) => {
+      const bytes = payloads.get(asset.id);
+      if (bytes && !asset.objectUrl) {
+        asset.objectUrl = createObjectUrl(bytes, asset);
+      }
+    });
+    return payloads;
   });
 
   return {
     document: loaded.document,
-    assetPayloads,
+    assetPayloads: await assetPayloads,
   };
 }

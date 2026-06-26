@@ -335,10 +335,16 @@ async function importExternalProjectPath(filePath: string): Promise<boolean> {
     document.project.meta.updatedAt = new Date().toISOString();
 
     await saveMsepProject(document, savePath, imported.assetPayloads);
-    await refreshRecentProjectPreview(
+    const lastModified = await readFileModifiedAt(savePath);
+    recentProjectsStore.upsertProject({
+      name: document.project.meta.name,
+      filePath: savePath,
+      lastModified,
+    });
+    void refreshRecentProjectPreview(
       savePath,
       document.project.meta.name,
-      await readFileModifiedAt(savePath),
+      lastModified,
       document,
     );
     showToast(buildExternalImportSuccessMessage(imported.warnings));

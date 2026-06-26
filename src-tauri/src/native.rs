@@ -5,6 +5,7 @@ use std::fs::{self, File};
 use std::io::{Cursor, ErrorKind, Read, Write};
 use std::num::{NonZeroU32, NonZeroU8};
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::UNIX_EPOCH;
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::DecoderOptions;
@@ -30,6 +31,7 @@ const MOTOR_NOISE_CSV_HEADER: &str = "bvets motor noise table 0.01";
 const NO_EXPORTABLE_TRACKS_MESSAGE: &str = "No exportable tracks have assigned audio.";
 const UNSUPPORTED_EXPORT_COMMAND_MESSAGE: &str =
     "Selected export format is not supported by this command.";
+const MAX_METADATA_DECODE_THREADS: usize = 4;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -1112,45 +1114,64 @@ pub fn startup_msep_path() -> Option<String> {
     msep_path_from_args(std::env::args())
 }
 
+fn read_audio_metadata_item(item: AudioMetadataSource) -> AudioMetadataResult {
+    let AudioMetadataSource {
+        asset_id,
+        path,
+        file_name,
+        bytes,
+    } = item;
+
+    match decode_audio_source(path.clone(), file_name, bytes) {
+        Ok(decoded) => {
+            let mut metadata = metadata_from_decoded_audio(&decoded);
+            metadata.asset_id = asset_id;
+            metadata.path = path;
+            metadata
+        }
+        Err(error) => AudioMetadataResult {
+            asset_id,
+            path,
+            duration_sec: None,
+            sample_rate: None,
+            channels: None,
+            error: Some(error),
+        },
+    }
+}
+
+fn join_metadata_handles(
+    handles: &mut Vec<thread::JoinHandle<AudioMetadataResult>>,
+    results: &mut Vec<AudioMetadataResult>,
+) {
+    for handle in handles.drain(..) {
+        if let Ok(result) = handle.join() {
+            results.push(result);
+        }
+    }
+}
+
 #[tauri::command]
 pub fn read_audio_metadata_batch(
     items: Vec<AudioMetadataSource>,
 ) -> Result<Vec<AudioMetadataResult>, String> {
-    let handles = items
-        .into_iter()
-        .map(|item| {
-            std::thread::spawn(move || {
-                let AudioMetadataSource {
-                    asset_id,
-                    path,
-                    file_name,
-                    bytes,
-                } = item;
+    let worker_count = thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1)
+        .clamp(1, MAX_METADATA_DECODE_THREADS);
+    let mut results = Vec::with_capacity(items.len());
+    let mut handles = Vec::with_capacity(worker_count);
 
-                match decode_audio_source(path.clone(), file_name, bytes) {
-                    Ok(decoded) => {
-                        let mut metadata = metadata_from_decoded_audio(&decoded);
-                        metadata.asset_id = asset_id;
-                        metadata.path = path;
-                        metadata
-                    }
-                    Err(error) => AudioMetadataResult {
-                        asset_id,
-                        path,
-                        duration_sec: None,
-                        sample_rate: None,
-                        channels: None,
-                        error: Some(error),
-                    },
-                }
-            })
-        })
-        .collect::<Vec<_>>();
+    for item in items {
+        handles.push(thread::spawn(move || read_audio_metadata_item(item)));
 
-    Ok(handles
-        .into_iter()
-        .filter_map(|handle| handle.join().ok())
-        .collect())
+        if handles.len() >= worker_count {
+            join_metadata_handles(&mut handles, &mut results);
+        }
+    }
+
+    join_metadata_handles(&mut handles, &mut results);
+    Ok(results)
 }
 
 #[tauri::command]

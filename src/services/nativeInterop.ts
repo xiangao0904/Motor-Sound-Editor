@@ -4,6 +4,7 @@ import type { ID } from "@/types/common";
 import type { ProjectDocument } from "@/types/project";
 import type { CurveSetKind, Track } from "@/types/track";
 import { sanitizeProjectDocument } from "@/utils/clone";
+import { measureAsync } from "@/utils/perfTrace";
 
 type RawPayloadRecord = Record<string, number[]>;
 type IpcPayloadRecord = Record<string, Uint8Array>;
@@ -17,7 +18,7 @@ export interface AudioMetadataSource {
   assetId?: ID;
   path?: string;
   fileName?: string;
-  bytes?: number[];
+  bytes?: number[] | Uint8Array;
 }
 
 export interface AudioMetadataResult {
@@ -88,14 +89,18 @@ export async function openNativeMsepProject(
 }
 
 export async function readExternalFile(path: string): Promise<Uint8Array> {
-  const bytes = await invoke<number[]>("read_external_file", { path });
+  const bytes = await measureAsync(`read external file ${path}`, () =>
+    invoke<number[]>("read_external_file", { path }),
+  );
   return new Uint8Array(bytes);
 }
 
 export async function readAudioMetadataBatch(
   items: AudioMetadataSource[],
 ): Promise<AudioMetadataResult[]> {
-  return invoke<AudioMetadataResult[]>("read_audio_metadata_batch", { items });
+  return measureAsync(`read audio metadata batch (${items.length})`, () =>
+    invoke<AudioMetadataResult[]>("read_audio_metadata_batch", { items }),
+  );
 }
 
 export async function sampleCurvesBatch(

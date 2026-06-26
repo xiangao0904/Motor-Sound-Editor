@@ -3,6 +3,7 @@ import {
   readExternalFile,
 } from "@/services/nativeInterop";
 import { fileNameFromPath } from "@/services/msepProject";
+import { measureAsync, measureSync } from "@/utils/perfTrace";
 import type { ID } from "@/types/common";
 import type { ProjectDocument } from "@/types/project";
 import type {
@@ -117,13 +118,15 @@ export function isExternalImportPath(filePath: string): boolean {
 export async function importExternalProject(
   entryPath: string,
 ): Promise<ImportedProjectResult> {
-  const kind = detectImportEntryKind(entryPath);
-  const source =
-    kind === "bve"
-      ? await parseVehicleProject(entryPath)
-      : await parseMtrProject(entryPath);
+  return measureAsync("external import total", async () => {
+    const kind = detectImportEntryKind(entryPath);
+    const source =
+      kind === "bve"
+        ? await parseVehicleProject(entryPath)
+        : await parseMtrProject(entryPath);
 
-  return buildImportedProject(source);
+    return buildImportedProject(source);
+  });
 }
 
 function detectImportEntryKind(entryPath: string): ImportEntryKind {
@@ -155,33 +158,45 @@ async function parseVehicleProject(entryPath: string): Promise<ImportedSourceDat
   const powerSection = getRequiredSection(motorNoiseSections, "Power");
   const brakeSection = getRequiredSection(motorNoiseSections, "Brake");
 
-  return {
-    kind: "bve",
-    defaultProjectName: fileNameFromPath(dirname(entryPath)) || "imported_project",
-    audioBaseDir: dirname(soundPath),
-    motorEntries,
-    tractionPitch: await parseMotorCsv(
+  const [
+    tractionPitch,
+    tractionVolume,
+    brakePitch,
+    brakeVolume,
+  ] = await Promise.all([
+    parseMotorCsv(
       resolveRelativePath(
         dirname(motorNoisePath),
         getRequiredValue(powerSection, "Frequency"),
       ),
       motorEntries.length,
     ),
-    tractionVolume: await parseMotorCsv(
+    parseMotorCsv(
       resolveRelativePath(dirname(motorNoisePath), getRequiredValue(powerSection, "Volume")),
       motorEntries.length,
     ),
-    brakePitch: await parseMotorCsv(
+    parseMotorCsv(
       resolveRelativePath(
         dirname(motorNoisePath),
         getRequiredValue(brakeSection, "Frequency"),
       ),
       motorEntries.length,
     ),
-    brakeVolume: await parseMotorCsv(
+    parseMotorCsv(
       resolveRelativePath(dirname(motorNoisePath), getRequiredValue(brakeSection, "Volume")),
       motorEntries.length,
     ),
+  ]);
+
+  return {
+    kind: "bve",
+    defaultProjectName: fileNameFromPath(dirname(entryPath)) || "imported_project",
+    audioBaseDir: dirname(soundPath),
+    motorEntries,
+    tractionPitch,
+    tractionVolume,
+    brakePitch,
+    brakeVolume,
   };
 }
 
@@ -261,56 +276,70 @@ export async function parseMotorCsv(
   path: string,
   expectedTrackCount: number,
 ): Promise<ParsedMotorCsv> {
-  const text = await readTextWithFallback(path);
-  const rows = text
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  const text = await measureAsync(`read CSV ${fileNameFromPath(path)}`, () =>
+    readTextWithFallback(path),
+  );
 
-  if (rows.length === 0) {
-    throw new ProjectImportError("invalid-csv", fileNameFromPath(path));
-  }
+  return measureSync(`parse CSV ${fileNameFromPath(path)}`, () => {
+    const columns = Array.from({ length: expectedTrackCount }, () => [] as ParsedMotorCsvPoint[]);
+    let maxSpeed = 0;
+    let hasDataRows = false;
+    let parserMode: "dense" | "sparse" | null = null;
+    let sparseTrackIndexByColumn: number[] = [];
 
-  const dataRows =
-    rows[0].toLowerCase().startsWith("bvets motor noise table")
-      ? rows.slice(1)
-      : rows;
+    forEachNonEmptyLine(text, (line, rowIndex) => {
+      if (!hasDataRows && line.toLowerCase().startsWith("bvets motor noise table")) {
+        return;
+      }
 
-  if (dataRows.length === 0) {
-    throw new ProjectImportError("invalid-csv", fileNameFromPath(path));
-  }
+      if (!parserMode) {
+        const firstRowParts = splitCsvLine(line);
+        parserMode = firstRowParts[0] === "#" ? "sparse" : "dense";
 
-  const columns = Array.from({ length: expectedTrackCount }, () => [] as ParsedMotorCsvPoint[]);
-  let maxSpeed = 0;
-  const firstRowParts = splitCsvLine(dataRows[0]);
+        if (parserMode === "sparse") {
+          sparseTrackIndexByColumn = parseSparseMotorCsvHeader(
+            firstRowParts,
+            path,
+            expectedTrackCount,
+          );
+          hasDataRows = true;
+          return;
+        }
+      }
 
-  if (firstRowParts[0] === "#") {
-    parseSparseMotorCsvRows(
-      dataRows,
-      path,
-      expectedTrackCount,
-      columns,
-      (speed) => {
+      hasDataRows = true;
+      const speed =
+        parserMode === "sparse"
+          ? parseSparseMotorCsvLine(
+              line,
+              path,
+              rowIndex,
+              sparseTrackIndexByColumn,
+              columns,
+            )
+          : parseDenseMotorCsvLine(
+              line,
+              path,
+              rowIndex,
+              expectedTrackCount,
+              columns,
+            );
+
+      if (speed !== null) {
         maxSpeed = Math.max(maxSpeed, speed);
-      },
-    );
-  } else {
-    parseDenseMotorCsvRows(
-      dataRows,
-      path,
-      expectedTrackCount,
-      columns,
-      (speed) => {
-        maxSpeed = Math.max(maxSpeed, speed);
-      },
-    );
-  }
+      }
+    });
 
-  return {
-    path,
-    maxSpeed,
-    columns,
-  };
+    if (!hasDataRows) {
+      throw new ProjectImportError("invalid-csv", fileNameFromPath(path));
+    }
+
+    return {
+      path,
+      maxSpeed,
+      columns,
+    };
+  });
 }
 
 async function buildImportedProject(
@@ -472,17 +501,18 @@ async function loadAvailableAudioAssets(
     }),
   );
 
-  const metadata = await readAudioMetadataBatch(
+  const metadata = await measureAsync("decode imported audio metadata", () =>
+    readAudioMetadataBatch(
     resolvedAudio.flatMap((item) =>
       item
         ? [
             {
               path: item.path,
               fileName: item.fileName,
-              bytes: Array.from(item.bytes),
             },
           ]
         : [],
+    ),
     ),
   );
 
@@ -691,49 +721,65 @@ function splitCsvLine(line: string): string[] {
   return line.split(",").map((part) => part.trim());
 }
 
-function parseDenseMotorCsvRows(
-  rows: string[],
-  path: string,
-  expectedTrackCount: number,
-  columns: ParsedMotorCsvPoint[][],
-  onSpeed: (speed: number) => void,
+function forEachNonEmptyLine(
+  text: string,
+  visitor: (line: string, rowIndex: number) => void,
 ) {
-  rows.forEach((line, rowIndex) => {
-    const parts = splitCsvLine(line);
-    if (parts.every((part) => part.length === 0)) {
-      return;
+  let rowIndex = 0;
+  let start = 0;
+
+  for (let index = 0; index <= text.length; index += 1) {
+    const char = text[index];
+    if (index < text.length && char !== "\n") {
+      continue;
     }
 
-    if (parts.length !== expectedTrackCount + 1) {
-      throw new ProjectImportError("invalid-csv", fileNameFromPath(path));
+    const end = index > start && text[index - 1] === "\r" ? index - 1 : index;
+    const line = text.slice(start, end).trim();
+    if (line.length > 0) {
+      visitor(line, rowIndex);
     }
 
-    const speed = parseRequiredNumber(parts[0], path, rowIndex, 0);
-    onSpeed(speed);
-
-    for (let columnIndex = 0; columnIndex < expectedTrackCount; columnIndex += 1) {
-      const rawValue = parts[columnIndex + 1];
-      if (!rawValue) {
-        continue;
-      }
-
-      columns[columnIndex].push({
-        speed,
-        value: parseRequiredNumber(rawValue, path, rowIndex, columnIndex + 1),
-      });
-    }
-  });
+    rowIndex += 1;
+    start = index + 1;
+  }
 }
 
-function parseSparseMotorCsvRows(
-  rows: string[],
+function parseDenseMotorCsvLine(
+  line: string,
   path: string,
+  rowIndex: number,
   expectedTrackCount: number,
   columns: ParsedMotorCsvPoint[][],
-  onSpeed: (speed: number) => void,
-) {
-  const headerParts = splitCsvLine(rows[0]);
-  const trackIndexByColumn = headerParts.slice(1).map((part, index) => {
+): number {
+  const parts = splitCsvLine(line);
+  if (parts.length !== expectedTrackCount + 1) {
+    throw new ProjectImportError("invalid-csv", fileNameFromPath(path));
+  }
+
+  const speed = parseRequiredNumber(parts[0], path, rowIndex, 0);
+
+  for (let columnIndex = 0; columnIndex < expectedTrackCount; columnIndex += 1) {
+    const rawValue = parts[columnIndex + 1];
+    if (!rawValue) {
+      continue;
+    }
+
+    columns[columnIndex].push({
+      speed,
+      value: parseRequiredNumber(rawValue, path, rowIndex, columnIndex + 1),
+    });
+  }
+
+  return speed;
+}
+
+function parseSparseMotorCsvHeader(
+  headerParts: string[],
+  path: string,
+  expectedTrackCount: number,
+): number[] {
+  return headerParts.slice(1).map((part, index) => {
     if (!part) {
       return index;
     }
@@ -745,39 +791,41 @@ function parseSparseMotorCsvRows(
 
     return parsed;
   });
+}
 
-  rows.slice(1).forEach((line, rowOffset) => {
-    const rowIndex = rowOffset + 1;
-    const parts = splitCsvLine(line);
-    if (parts.every((part) => part.length === 0)) {
-      return;
+function parseSparseMotorCsvLine(
+  line: string,
+  path: string,
+  rowIndex: number,
+  trackIndexByColumn: number[],
+  columns: ParsedMotorCsvPoint[][],
+): number | null {
+  const parts = splitCsvLine(line);
+  const speedCell = parts[0] ?? "";
+  if (!speedCell) {
+    return null;
+  }
+
+  const speed = parseRequiredNumber(speedCell, path, rowIndex, 0);
+
+  for (
+    let columnOffset = 0;
+    columnOffset < trackIndexByColumn.length;
+    columnOffset += 1
+  ) {
+    const rawValue = parts[columnOffset + 1] ?? "";
+    if (!rawValue) {
+      continue;
     }
 
-    const speedCell = parts[0] ?? "";
-    if (!speedCell) {
-      return;
-    }
+    const trackIndex = trackIndexByColumn[columnOffset];
+    columns[trackIndex].push({
+      speed,
+      value: parseRequiredNumber(rawValue, path, rowIndex, columnOffset + 1),
+    });
+  }
 
-    const speed = parseRequiredNumber(speedCell, path, rowIndex, 0);
-    onSpeed(speed);
-
-    for (
-      let columnOffset = 0;
-      columnOffset < trackIndexByColumn.length;
-      columnOffset += 1
-    ) {
-      const rawValue = parts[columnOffset + 1] ?? "";
-      if (!rawValue) {
-        continue;
-      }
-
-      const trackIndex = trackIndexByColumn[columnOffset];
-      columns[trackIndex].push({
-        speed,
-        value: parseRequiredNumber(rawValue, path, rowIndex, columnOffset + 1),
-      });
-    }
-  });
+  return speed;
 }
 
 async function canReadFile(path: string): Promise<boolean> {
