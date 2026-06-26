@@ -1,7 +1,7 @@
 import type { ID, ISODateString, TimestampInfo } from "./common";
 import type { AudioAsset, Track } from "./track";
 
-export const APP_VERSION = "1.1.1";
+export const APP_VERSION = "1.2.0";
 export const PROJECT_SCHEMA_VERSION = 1;
 
 export interface ProjectMeta extends TimestampInfo {

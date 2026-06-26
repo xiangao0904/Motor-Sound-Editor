@@ -1,8 +1,8 @@
 [package]
 name = "motor-sound-editor"
 version = "1.2.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Desktop editor for building and exporting BVE-style motor sound projects"
+authors = ["xiangao0904"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
