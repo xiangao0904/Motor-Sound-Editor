@@ -44,6 +44,10 @@
   <text key="home.importMissingAudio">音声がありません：</text>
   <text key="home.exportLoadFailed">エクスポート用にプロジェクトを読み込めませんでした</text>
   <text key="home.removed">削除済み</text>
+  <text key="home.loadingOpen">プロジェクトを開いています...</text>
+  <text key="home.loadingImport">プロジェクトをインポートしています...</text>
+  <text key="home.loadingExternalImport">外部プロジェクトをインポートしています...</text>
+  <text key="home.loadingPrepareExport">エクスポートを準備しています...</text>
   <text key="settings.title">設定</text>
   <text key="settings.language">言語</text>
   <text key="settings.snap">Shift スナップ</text>

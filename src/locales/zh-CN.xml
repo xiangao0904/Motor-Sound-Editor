@@ -44,6 +44,10 @@
   <text key="home.importMissingAudio">缺少音频：</text>
   <text key="home.exportLoadFailed">无法加载工程用于导出</text>
   <text key="home.removed">已移除</text>
+  <text key="home.loadingOpen">正在打开工程…</text>
+  <text key="home.loadingImport">正在导入工程…</text>
+  <text key="home.loadingExternalImport">正在导入外部工程…</text>
+  <text key="home.loadingPrepareExport">正在准备导出…</text>
   <text key="settings.title">设置</text>
   <text key="settings.language">语言</text>
   <text key="settings.snap">Shift 吸附</text>

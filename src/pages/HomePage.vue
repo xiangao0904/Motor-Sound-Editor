@@ -49,6 +49,7 @@ const contextMenu = reactive({ visible: false, x: 0, y: 0 });
 const isCreateDialogOpen = ref(false);
 const isSettingsDialogOpen = ref(false);
 const isPreparingExport = ref(false);
+const loadingMessage = ref("");
 const exportDocument = ref<ProjectDocument | null>(null);
 const exportAssetPayloads = ref(new Map<string, Uint8Array>());
 const toast = ref("");
@@ -108,6 +109,18 @@ const contextProject = computed(
       (project) => project.id === contextProjectId.value,
     ) ?? null,
 );
+const isLoading = computed(() => loadingMessage.value.length > 0);
+
+async function withLoading<T>(message: string, task: () => Promise<T>): Promise<T> {
+  const previousMessage = loadingMessage.value;
+  loadingMessage.value = message;
+
+  try {
+    return await task();
+  } finally {
+    loadingMessage.value = previousMessage;
+  }
+}
 
 function formatProjectTime(value: string): string {
   const date = new Date(value);
@@ -226,30 +239,32 @@ async function openProjectPath(filePath: string) {
   }
 
   try {
-    const loaded = await openMsepProject(filePath);
-    projectStore.loadProject(loaded.document, filePath);
-    assetPayloadStore.clear();
-    loaded.assetPayloads.forEach((bytes, assetId) => {
-      assetPayloadStore.setPayload(assetId, bytes);
-    });
+    await withLoading(i18n.t("home.loadingOpen"), async () => {
+      const loaded = await openMsepProject(filePath);
+      projectStore.loadProject(loaded.document, filePath);
+      assetPayloadStore.clear();
+      loaded.assetPayloads.forEach((bytes, assetId) => {
+        assetPayloadStore.setPayload(assetId, bytes);
+      });
 
-    const lastModified = await readFileModifiedAt(filePath);
-    const existingProject = recentProjectsStore.findByFilePath(filePath);
-    recentProjectsStore.upsertProject({
-      name: loaded.document.project.meta.name,
-      filePath,
-      lastModified,
-    });
-    emit("open-editor");
-
-    if (!existingProject?.previewReady) {
-      void refreshRecentProjectPreview(
+      const lastModified = await readFileModifiedAt(filePath);
+      const existingProject = recentProjectsStore.findByFilePath(filePath);
+      recentProjectsStore.upsertProject({
+        name: loaded.document.project.meta.name,
         filePath,
-        loaded.document.project.meta.name,
         lastModified,
-        loaded.document,
-      );
-    }
+      });
+      emit("open-editor");
+
+      if (!existingProject?.previewReady) {
+        void refreshRecentProjectPreview(
+          filePath,
+          loaded.document.project.meta.name,
+          lastModified,
+          loaded.document,
+        );
+      }
+    });
   } catch (error) {
     console.error("Project open failed", error);
     showToast(i18n.t("home.projectOpenFailed"));
@@ -258,22 +273,24 @@ async function openProjectPath(filePath: string) {
 
 async function importProjectPath(filePath: string): Promise<boolean> {
   try {
-    const loaded = await openMsepProject(filePath);
-    const existingProject = recentProjectsStore.findByFilePath(filePath);
-    const lastModified = await readFileModifiedAt(filePath);
-    recentProjectsStore.upsertProject({
-      name: loaded.document.project.meta.name,
-      filePath,
-      lastModified,
-    });
-    if (!existingProject?.previewReady) {
-      void refreshRecentProjectPreview(
+    await withLoading(i18n.t("home.loadingImport"), async () => {
+      const loaded = await openMsepProject(filePath);
+      const existingProject = recentProjectsStore.findByFilePath(filePath);
+      const lastModified = await readFileModifiedAt(filePath);
+      recentProjectsStore.upsertProject({
+        name: loaded.document.project.meta.name,
         filePath,
-        loaded.document.project.meta.name,
         lastModified,
-        loaded.document,
-      );
-    }
+      });
+      if (!existingProject?.previewReady) {
+        void refreshRecentProjectPreview(
+          filePath,
+          loaded.document.project.meta.name,
+          lastModified,
+          loaded.document,
+        );
+      }
+    });
     showToast(i18n.t("home.projectImported"));
     return true;
   } catch (error) {
@@ -317,7 +334,9 @@ function buildExternalImportSuccessMessage(warnings: string[]): string {
 
 async function importExternalProjectPath(filePath: string): Promise<boolean> {
   try {
-    const imported = await importExternalProject(filePath);
+    const imported = await withLoading(i18n.t("home.loadingExternalImport"), () =>
+      importExternalProject(filePath),
+    );
     const selected = await save({
       title: "Save Imported MSEP Project",
       defaultPath: `${imported.defaultProjectName}.msep`,
@@ -414,7 +433,9 @@ function exportProject() {
 async function openExportDialogForProject(project: ProjectCardItem) {
   isPreparingExport.value = true;
   try {
-    const loaded = await openMsepProject(project.filePath);
+    const loaded = await withLoading(i18n.t("home.loadingPrepareExport"), () =>
+      openMsepProject(project.filePath),
+    );
     exportDocument.value = loaded.document;
     exportAssetPayloads.value = loaded.assetPayloads;
   } catch (error) {
@@ -715,6 +736,18 @@ onBeforeUnmount(() => {
           <button class="primary" type="submit">{{ i18n.t("home.create") }}</button>
         </footer>
       </form>
+    </div>
+
+    <div
+      v-if="isLoading"
+      class="loading-backdrop"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="loading-panel">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <p>{{ loadingMessage }}</p>
+      </div>
     </div>
 
     <p v-if="toast" class="toast" role="status">{{ toast }}</p>
@@ -1263,6 +1296,49 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(178, 213, 230, 0.16);
   border-radius: 7px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+}
+
+.loading-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 9, 12, 0.46);
+  backdrop-filter: blur(5px);
+}
+
+.loading-panel {
+  display: grid;
+  gap: 14px;
+  place-items: center;
+  min-width: 190px;
+  padding: 22px 26px;
+  color: #eef8fd;
+  background: rgba(31, 45, 54, 0.94);
+  border: 1px solid rgba(178, 213, 230, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+.loading-panel p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(220, 239, 248, 0.22);
+  border-top-color: #9fd1ea;
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .file-input {

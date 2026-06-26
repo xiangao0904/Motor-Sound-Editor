@@ -44,6 +44,10 @@
   <text key="home.importMissingAudio">Missing audio:</text>
   <text key="home.exportLoadFailed">Project could not be loaded for export</text>
   <text key="home.removed">removed</text>
+  <text key="home.loadingOpen">Opening project...</text>
+  <text key="home.loadingImport">Importing project...</text>
+  <text key="home.loadingExternalImport">Importing external project...</text>
+  <text key="home.loadingPrepareExport">Preparing export...</text>
   <text key="settings.title">Settings</text>
   <text key="settings.language">Language</text>
   <text key="settings.snap">Shift snap</text>
