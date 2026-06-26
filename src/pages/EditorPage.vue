@@ -144,6 +144,8 @@ const charts = new Map<CurveKind, ChartRuntime>();
 const resizeObservers: ResizeObserver[] = [];
 let animationFrame: number | null = null;
 let audioPreviewSyncFrame: number | null = null;
+let renderAllChartsFrame: number | null = null;
+let renderCurveChartsFrame: number | null = null;
 let lastFrameTime = 0;
 let isPreparingKeyframeDrag = false;
 let isDraggingKeyframe = false;
@@ -409,6 +411,41 @@ function queueAudioPreviewSync() {
   audioPreviewSyncFrame = requestAnimationFrame(() => {
     audioPreviewSyncFrame = null;
     syncAudioPreview();
+  });
+}
+
+function cancelQueuedChartRender() {
+  if (renderAllChartsFrame !== null) {
+    cancelAnimationFrame(renderAllChartsFrame);
+    renderAllChartsFrame = null;
+  }
+
+  if (renderCurveChartsFrame !== null) {
+    cancelAnimationFrame(renderCurveChartsFrame);
+    renderCurveChartsFrame = null;
+  }
+}
+
+function queueRenderAllCharts() {
+  if (renderAllChartsFrame !== null) return;
+
+  if (renderCurveChartsFrame !== null) {
+    cancelAnimationFrame(renderCurveChartsFrame);
+    renderCurveChartsFrame = null;
+  }
+
+  renderAllChartsFrame = requestAnimationFrame(() => {
+    renderAllChartsFrame = null;
+    renderAllCharts();
+  });
+}
+
+function queueRenderCurveCharts() {
+  if (renderAllChartsFrame !== null || renderCurveChartsFrame !== null) return;
+
+  renderCurveChartsFrame = requestAnimationFrame(() => {
+    renderCurveChartsFrame = null;
+    renderCurveCharts();
   });
 }
 
@@ -698,7 +735,7 @@ function finalizeCurrentKeyframeDrag(event?: Event) {
     clearCurrentKeyframeDragState(true);
     isFinalizingKeyframeDrag = false;
     queueAudioPreviewSync();
-    renderCurveCharts();
+    queueRenderCurveCharts();
   }
 }
 
@@ -827,7 +864,7 @@ function addKeyframeAtChartPoint(
     });
     pushHistory("Add keyframe");
     queueAudioPreviewSync();
-    renderCurveCharts();
+    queueRenderCurveCharts();
   }
 
   return keyframe;
@@ -935,7 +972,7 @@ function applyListEditor() {
   listEditorTrackId.value = null;
   closeTransientMenus();
   queueAudioPreviewSync();
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 function openListContextMenu(
@@ -1083,13 +1120,13 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
         }
       }
 
-      renderCurveCharts();
+      queueRenderCurveCharts();
       return;
     }
 
     if (!trackId && !keyframeId) {
       editorStore.selectKeyframe(null);
-      renderCurveCharts();
+      queueRenderCurveCharts();
     }
 
     return;
@@ -1104,7 +1141,7 @@ function handleChartClick(runtime: ChartRuntime, event: Event) {
       kind: runtime.config.kind,
       keyframeId,
     });
-    renderCurveCharts();
+    queueRenderCurveCharts();
     return;
   }
 
@@ -1171,7 +1208,7 @@ function handleChartContextMenu(
     editorStore.clearSelection();
     pushHistory("Delete keyframe");
     queueAudioPreviewSync();
-    renderCurveCharts();
+    queueRenderCurveCharts();
     return;
   }
 
@@ -1196,7 +1233,7 @@ function handleChartContextMenu(
 }
 
 function renderCharts() {
-  renderAllCharts();
+  queueRenderAllCharts();
 }
 
 function renderAllCharts() {
@@ -1612,7 +1649,7 @@ function tick(timestamp: number) {
 
 function setMode(mode: "traction" | "coasting" | "brake") {
   editorStore.setSimulatorMode(mode);
-  renderCurveCharts();
+  queueRenderCurveCharts();
   queueAudioPreviewSync();
 }
 
@@ -1624,7 +1661,7 @@ function setTool(tool: "select" | "move" | "keyframe") {
 
   stopCurrentKeyframeDrag();
   editorStore.setTool(tool);
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 function commitSpeed(value: number) {
@@ -1661,7 +1698,7 @@ function activateTrack(trackId: string | null) {
   }
 
   queueAudioPreviewSync();
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 function toggleTrackActivation(trackId: string) {
@@ -1709,7 +1746,7 @@ function updateTrackColor(event: Event) {
   const input = event.target as HTMLInputElement;
   projectStore.updateTrack(track.id, { color: input.value });
   pushHistory("Update track color");
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 function toggleTrackMute(trackId: string) {
@@ -1728,7 +1765,7 @@ function toggleTrackVisible(trackId: string) {
   projectStore.updateTrack(trackId, { visible: track.visible === false });
   pushHistory("Toggle visibility");
   queueAudioPreviewSync();
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 async function browseAudioFile() {
@@ -1797,7 +1834,7 @@ function updateSelectedPoint(axis: "speed" | "value", value: number) {
     axis === "speed" ? { speed: value } : { value },
   );
   pushHistory("Update keyframe");
-  renderCurveCharts();
+  queueRenderCurveCharts();
   queueAudioPreviewSync();
 }
 
@@ -1814,7 +1851,7 @@ function deleteSelectedPoint() {
   editorStore.clearSelection();
   pushHistory("Delete keyframe");
   queueAudioPreviewSync();
-  renderCurveCharts();
+  queueRenderCurveCharts();
 }
 
 function exportReserved() {
@@ -1824,7 +1861,7 @@ function exportReserved() {
 function clearActiveSelection() {
   if (selectedKeyframe.value) {
     editorStore.selectKeyframe(null);
-    renderCurveCharts();
+    queueRenderCurveCharts();
     return;
   }
 
@@ -1922,7 +1959,7 @@ watch(
   () => {
     if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
 
-    renderAllCharts();
+    queueRenderAllCharts();
   },
 );
 
@@ -1937,28 +1974,39 @@ watch(
   () => {
     if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
 
-    renderAllCharts();
+    queueRenderAllCharts();
   },
 );
 
 watch(
-  () =>
-    [
-      tracks.value,
-      activeTrackId.value,
-      activeCurveSet.value,
-      editorStore.view.tool,
-      selectedKeyframe.value,
-    ] as const,
+  () => tracks.value,
   () => {
     if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
 
-    renderCurveCharts();
+    queueRenderCurveCharts();
     if (editorStore.playback.transport === "playing") {
       queueAudioPreviewSync();
     }
   },
   { deep: true },
+);
+
+watch(
+  () =>
+    [
+      activeTrackId.value,
+      activeCurveSet.value,
+      editorStore.view.tool,
+      selectedKeyframe.value?.trackId,
+      selectedKeyframe.value?.curveSet,
+      selectedKeyframe.value?.kind,
+      selectedKeyframe.value?.keyframeId,
+    ] as const,
+  () => {
+    if (isPreparingKeyframeDrag || isDraggingKeyframe) return;
+
+    queueRenderCurveCharts();
+  },
 );
 
 watch(
@@ -2008,6 +2056,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopAnimationLoop();
+  cancelQueuedChartRender();
   if (audioPreviewSyncFrame !== null) {
     cancelAnimationFrame(audioPreviewSyncFrame);
     audioPreviewSyncFrame = null;

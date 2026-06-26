@@ -175,6 +175,12 @@ export const useProjectStore = defineStore("project", () => {
     dirty.value = true;
   }
 
+  function markDirtyWithoutTimestamp() {
+    if (!document.value) return;
+
+    dirty.value = true;
+  }
+
   function clearProject() {
     revokeDocumentObjectUrls(document.value);
     document.value = null;
@@ -491,7 +497,7 @@ export const useProjectStore = defineStore("project", () => {
       curve.keyframes = sortKeyframesBySpeed(curve.keyframes);
     }
 
-    markDirty();
+    markDirtyWithoutTimestamp();
   }
 
   function removeKeyframe(
