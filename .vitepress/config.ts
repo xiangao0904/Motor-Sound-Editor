@@ -145,7 +145,7 @@ const withSiteBase = (p: string) =>
 const cardImageUrl = toAbsoluteSiteUrl("/card-1.png");
 
 const installerUrl =
-  "https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.1.1/Motor.Sound.Editor_1.1.1_x64-setup.exe";
+  "https://github.com/xiangao0904/Motor-Sound-Editor/releases";
 
 const siteDescription =
   "Motor Sound Editor is a visual BVE and openBVE train sound editor for creating VVVF-style motor sound projects with curve editing, live preview, and export-ready packaging.";

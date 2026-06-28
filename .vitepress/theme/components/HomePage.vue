@@ -14,7 +14,7 @@ const props = withDefaults(
   },
 );
 
-const currentVersion = "v1.1.1";
+const currentVersion = "v1.2.0";
 const githubHref = "https://github.com/InfiniteGraphics/Motor-Sound-Editor";
 const content = computed(() => homeContent[props.locale]);
 const isChinese = computed(() => props.locale === "zh");
