@@ -334,7 +334,7 @@ export default defineConfig({
     socialLinks: [
       {
         icon: "github",
-        link: "https://github.com/InfiniteGraphics/Motor-Sound-Editor",
+        link: "https://github.com/xiangao0904/Motor-Sound-Editor",
       },
     ],
     search: {

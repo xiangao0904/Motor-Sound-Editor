@@ -11,7 +11,7 @@ You can download the sample project files below for reference or to compare with
 
 > 💡**Open Source License**: The following sample project files are licensed under the same MIT open source license as the software's source code. You are free to use, modify, or distribute these files.
 
-> 💡**Welcome to Share**: If you would like to contribute and open source your project files to this page, please post in [GitHub Issues](https://github.com/InfiniteGraphics/Motor-Sound-Editor/issues) and upload your `.msep` file.
+> 💡**Welcome to Share**: If you would like to contribute and open source your project files to this page, please post in [GitHub Issues](https://github.com/xiangao0904/Motor-Sound-Editor/issues) and upload your `.msep` file.
 
 <div class="docs-grid">
 
@@ -23,7 +23,7 @@ You can download the sample project files below for reference or to compare with
 
 <p>Contributor: K.L1</p>
 
-<a href="https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep">Download Example</a>
+<a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/caf_train_sound.msep">Download Example</a>
 
 </article>
 
@@ -35,7 +35,7 @@ You can download the sample project files below for reference or to compare with
 
 <p>Contributor: LX9702</p>
 
-<a href="https://github.com/InfiniteGraphics/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep">Download Example</a>
+<a href="https://github.com/xiangao0904/Motor-Sound-Editor/releases/download/v1.0.0/class323.msep">Download Example</a>
 
 </article>
 
