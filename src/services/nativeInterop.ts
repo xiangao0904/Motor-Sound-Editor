@@ -30,6 +30,13 @@ export interface AudioMetadataResult {
   error?: string;
 }
 
+export interface NormalizedAudioResult {
+  bytes: Uint8Array;
+  durationSec: number;
+  sampleRate: number;
+  channels: number;
+}
+
 export interface SampledTrackCurves {
   trackId: ID;
   pitch: number[];
@@ -101,6 +108,22 @@ export async function readAudioMetadataBatch(
   return measureAsync(`read audio metadata batch (${items.length})`, () =>
     invoke<AudioMetadataResult[]>("read_audio_metadata_batch", { items }),
   );
+}
+
+export async function normalizeAudioForPreview(
+  source: AudioMetadataSource,
+): Promise<NormalizedAudioResult> {
+  const result = await measureAsync("normalize audio for preview", () =>
+    invoke<Omit<NormalizedAudioResult, "bytes"> & { bytes: number[] | Uint8Array }>(
+      "normalize_audio_for_preview",
+      { source },
+    ),
+  );
+
+  return {
+    ...result,
+    bytes: new Uint8Array(result.bytes),
+  };
 }
 
 export async function sampleCurvesBatch(

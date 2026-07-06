@@ -1,4 +1,5 @@
 import type { AudioAsset, CurveSetKind, Track } from "@/types/track";
+import { decodeAudioBytesWithNativeFallback } from "@/services/audioDecode";
 import { sampleCurve } from "@/utils/curves";
 
 const AUDIO_PARAM_SMOOTHING_TIME = 0.05;
@@ -17,6 +18,10 @@ export class AudioPreviewEngine {
   private pendingLoads = new Map<string, Promise<AudioBuffer | null>>();
   private playing = new Map<string, PlayingTrack>();
 
+  constructor(
+    private readonly resolveAssetBytes?: (asset: AudioAsset) => Uint8Array | null,
+  ) {}
+
   async loadAsset(asset: AudioAsset): Promise<AudioBuffer | null> {
     if (this.buffers.has(asset.id)) {
       return this.buffers.get(asset.id) ?? null;
@@ -27,14 +32,15 @@ export class AudioPreviewEngine {
       return existingLoad;
     }
 
-    const objectUrl = asset.objectUrl;
-    if (!objectUrl) return null;
-
     const loadPromise = (async () => {
-      const context = this.getContext();
-      const response = await fetch(objectUrl);
-      const data = await response.arrayBuffer();
-      const buffer = await context.decodeAudioData(data.slice(0));
+      const bytes = await this.readAssetBytes(asset);
+      if (!bytes) return null;
+
+      this.getContext();
+      const { buffer } = await decodeAudioBytesWithNativeFallback(bytes, {
+        path: asset.originalPath,
+        fileName: asset.fileName,
+      });
       this.buffers.set(asset.id, buffer);
       return buffer;
     })();
@@ -175,6 +181,16 @@ export class AudioPreviewEngine {
     }
 
     return this.context;
+  }
+
+  private async readAssetBytes(asset: AudioAsset): Promise<Uint8Array | null> {
+    const payloadBytes = this.resolveAssetBytes?.(asset);
+    if (payloadBytes) return payloadBytes;
+
+    if (!asset.objectUrl) return null;
+
+    const response = await fetch(asset.objectUrl);
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   private setImmediateValue(param: AudioParam, value: number, atTime: number) {

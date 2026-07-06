@@ -3,9 +3,10 @@ mod native;
 use tauri::{Emitter, Manager};
 
 use native::{
-    export_bve_project, export_mtr_project, msep_path_from_args, open_msep_file, pack_msep_file,
-    read_audio_metadata_batch, read_external_file, read_msep_file, read_msep_modified_at,
-    register_msep_file_association, sample_curves_batch, startup_msep_path, write_msep_file,
+    export_bve_project, export_mtr_project, msep_path_from_args, normalize_audio_for_preview,
+    open_msep_file, pack_msep_file, read_audio_metadata_batch, read_external_file, read_msep_file,
+    read_msep_modified_at, register_msep_file_association, sample_curves_batch, startup_msep_path,
+    write_msep_file,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -33,6 +34,7 @@ pub fn run() {
             read_msep_modified_at,
             startup_msep_path,
             read_audio_metadata_batch,
+            normalize_audio_for_preview,
             sample_curves_batch,
             pack_msep_file,
             open_msep_file,

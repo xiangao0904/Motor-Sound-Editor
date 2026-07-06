@@ -101,7 +101,9 @@ const editorStore = useEditorStore();
 const historyStore = useHistoryStore();
 const i18n = useI18nStore();
 const settingsStore = useSettingsStore();
-const audioEngine = new AudioPreviewEngine();
+const audioEngine = new AudioPreviewEngine((asset) =>
+  assetPayloadStore.getPayload(asset.id),
+);
 
 const pitchChartEl = ref<HTMLDivElement | null>(null);
 const volumeChartEl = ref<HTMLDivElement | null>(null);
