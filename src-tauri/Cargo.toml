@@ -1,6 +1,6 @@
 [package]
 name = "motor-sound-editor"
-version = "1.2.0"
+version = "1.2.1"
 description = "Desktop editor for building and exporting BVE-style motor sound projects"
 authors = ["xiangao0904"]
 edition = "2021"

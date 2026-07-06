@@ -16,11 +16,11 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::default::{get_codecs, get_probe};
 use tauri::{AppHandle, Manager};
+use vorbis_rs::VorbisEncoderBuilder;
 #[cfg(target_os = "windows")]
 use winreg::enums::HKEY_CURRENT_USER;
 #[cfg(target_os = "windows")]
 use winreg::RegKey;
-use vorbis_rs::VorbisEncoderBuilder;
 use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
@@ -160,6 +160,15 @@ pub struct AudioMetadataResult {
     sample_rate: Option<u32>,
     channels: Option<u32>,
     error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NormalizedAudioResult {
+    bytes: Vec<u8>,
+    duration_sec: f64,
+    sample_rate: u32,
+    channels: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -404,8 +413,10 @@ fn create_msep_archive(
 
     zip.start_file(TRACKS_FILE_NAME, options)
         .map_err(|error| error.to_string())?;
-    zip.write_all(&serde_json::to_vec_pretty(&compact_document.tracks).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())?;
+    zip.write_all(
+        &serde_json::to_vec_pretty(&compact_document.tracks).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
 
     for asset in &compact_document.tracks.assets {
         if let Some(bytes) = asset_payloads.get(&asset.id) {
@@ -681,12 +692,12 @@ fn encode_wav_pcm16(decoded: &DecodedAudio) -> Vec<u8> {
 }
 
 fn encode_ogg_vorbis(decoded: &DecodedAudio) -> Result<Vec<u8>, String> {
-    let sample_rate =
-        NonZeroU32::new(decoded.sample_rate).ok_or_else(|| "Sample rate must be greater than 0".to_string())?;
+    let sample_rate = NonZeroU32::new(decoded.sample_rate)
+        .ok_or_else(|| "Sample rate must be greater than 0".to_string())?;
     let channel_count = u8::try_from(decoded.channels.len())
         .map_err(|_| "Too many channels for OGG/Vorbis export".to_string())?;
-    let channels =
-        NonZeroU8::new(channel_count).ok_or_else(|| "Audio must contain at least one channel".to_string())?;
+    let channels = NonZeroU8::new(channel_count)
+        .ok_or_else(|| "Audio must contain at least one channel".to_string())?;
 
     let mut builder = VorbisEncoderBuilder::new(sample_rate, channels, Vec::new())
         .map_err(|error| error.to_string())?;
@@ -1014,11 +1025,8 @@ fn create_mtr_archive(
     write_motor_noise_csv_files(&mut zip, options_zip, &sound_root, &tracks)?;
 
     for (index, track) in tracks.iter().enumerate() {
-        let ogg_bytes = encode_track_bytes(
-            track,
-            options.sample_rate,
-            EncodedTrackMode::MonoOggVorbis,
-        )?;
+        let ogg_bytes =
+            encode_track_bytes(track, options.sample_rate, EncodedTrackMode::MonoOggVorbis)?;
         zip.start_file(format!("{sound_root}/motor{index}.ogg"), options_zip)
             .map_err(|error| error.to_string())?;
         zip.write_all(&ogg_bytes)
@@ -1172,6 +1180,22 @@ pub fn read_audio_metadata_batch(
 
     join_metadata_handles(&mut handles, &mut results);
     Ok(results)
+}
+
+#[tauri::command]
+pub fn normalize_audio_for_preview(
+    source: AudioMetadataSource,
+) -> Result<NormalizedAudioResult, String> {
+    let decoded = decode_audio_source(source.path, source.file_name, source.bytes)?;
+    let metadata = metadata_from_decoded_audio(&decoded);
+    let bytes = encode_wav_pcm16(&decoded);
+
+    Ok(NormalizedAudioResult {
+        bytes,
+        duration_sec: metadata.duration_sec.unwrap_or_default(),
+        sample_rate: metadata.sample_rate.unwrap_or_default(),
+        channels: metadata.channels.unwrap_or_default(),
+    })
 }
 
 #[tauri::command]
