@@ -31,7 +31,7 @@
   <text key="home.create">Create</text>
   <text key="home.onlyMsepOpen">Only .msep projects can be opened</text>
   <text key="home.onlyMsepImport">Only .msep projects can be imported</text>
-  <text key="home.onlySupportedImport">Only .msep, vehicle.txt, or sound.cfg files can be imported</text>
+  <text key="home.onlySupportedImport">Only .msep, vehicle.txt, sound.cfg, or train.dat files can be imported</text>
   <text key="home.projectCreatedFailed">Project could not be created</text>
   <text key="home.projectOpenFailed">Project could not be opened</text>
   <text key="home.projectImportFailed">Project could not be imported</text>

@@ -31,7 +31,7 @@
   <text key="home.create">作成</text>
   <text key="home.onlyMsepOpen">開けるのは .msep プロジェクトだけです</text>
   <text key="home.onlyMsepImport">インポートできるのは .msep プロジェクトだけです</text>
-  <text key="home.onlySupportedImport">インポートできるのは .msep、vehicle.txt、sound.cfg だけです</text>
+  <text key="home.onlySupportedImport">インポートできるのは .msep、vehicle.txt、sound.cfg、train.dat だけです</text>
   <text key="home.projectCreatedFailed">プロジェクトを作成できませんでした</text>
   <text key="home.projectOpenFailed">プロジェクトを開けませんでした</text>
   <text key="home.projectImportFailed">プロジェクトをインポートできませんでした</text>

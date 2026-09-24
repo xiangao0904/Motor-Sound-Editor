@@ -194,6 +194,13 @@ pub struct MtrExportOptions {
     attenuation_distance: u32,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenBveExportOptions {
+    format: String,
+    sample_rate: u32,
+}
+
 #[derive(Debug, Clone)]
 struct DecodedAudio {
     sample_rate: u32,
@@ -1038,6 +1045,138 @@ fn create_mtr_archive(
         .map_err(|error| error.to_string())
 }
 
+fn openbve_motor_rows(
+    tracks: &[ExportableTrack<'_>],
+    curve_set: CurveSetKind,
+    slot: usize,
+    max_speed: f64,
+) -> Result<Vec<String>, String> {
+    let row_count = (max_speed.max(0.0) * 5.0).ceil() as usize + 1;
+    let mut rows = Vec::with_capacity(row_count);
+    for row in 0..row_count {
+        let speed = row as f64 / 5.0;
+        let mut active = Vec::new();
+        for (index, exportable) in tracks.iter().enumerate() {
+            let curves = exportable.track.curve_set(curve_set)?;
+            let volume = sample_curve(&curves.volume, speed);
+            if volume > 0.000_001 {
+                active.push((index, curves, volume));
+            }
+        }
+        if active.len() > 2 {
+            return Err(format!(
+                "OpenBVE supports at most two simultaneous motor sounds per mode; {} are active at {:.1} km/h.",
+                active.len(), speed
+            ));
+        }
+        if let Some((index, curves, volume)) = active.get(slot) {
+            let pitch = sample_curve(&curves.pitch, speed) * 100.0;
+            rows.push(format!(
+                "{index},{},{}",
+                format_number(pitch),
+                format_number(volume * 128.0)
+            ));
+        } else {
+            rows.push("-1,100,0".to_string());
+        }
+    }
+    Ok(rows)
+}
+
+fn create_openbve_archive(
+    document: &ProjectDocument,
+    asset_payloads: &HashMap<String, Vec<u8>>,
+    options: &OpenBveExportOptions,
+) -> Result<Vec<u8>, String> {
+    let tracks = exportable_tracks(document, asset_payloads);
+    if tracks.is_empty() {
+        return Err(NO_EXPORTABLE_TRACKS_MESSAGE.to_string());
+    }
+    let max_speed = document.project.meta.max_speed;
+    if !max_speed.is_finite() || !(0.0..=500.0).contains(&max_speed) {
+        return Err("OpenBVE export requires a maximum speed between 0 and 500 km/h.".to_string());
+    }
+
+    let mut train_dat = vec![
+        "OPENBVE".to_string(),
+        "; Motor Sound Editor: default vehicle parameters are placeholders.".to_string(),
+        "#ACCELERATION".to_string(),
+        format!(
+            "{0},{0},25,80,1",
+            format_number(document.project.meta.acceleration.max(0.1))
+        ),
+        "#PERFORMANCE".to_string(),
+        format_number(document.project.meta.brake_deceleration.max(0.1)),
+        "#BRAKE".to_string(),
+        "0".to_string(),
+        "0".to_string(),
+        "0".to_string(),
+        "#HANDLE".to_string(),
+        "0".to_string(),
+        "1".to_string(),
+        "8".to_string(),
+        "0".to_string(),
+        "#CAR".to_string(),
+        "40".to_string(),
+        "1".to_string(),
+        "40".to_string(),
+        "0".to_string(),
+        "20".to_string(),
+        "1".to_string(),
+        "2.8".to_string(),
+        "3.6".to_string(),
+        "1.6".to_string(),
+        "6".to_string(),
+        "2".to_string(),
+        "#DEVICE".to_string(),
+        "0".to_string(),
+    ];
+    for (section, mode, slot) in [
+        ("MOTOR_P1", CurveSetKind::Traction, 0),
+        ("MOTOR_P2", CurveSetKind::Traction, 1),
+        ("MOTOR_B1", CurveSetKind::Brake, 0),
+        ("MOTOR_B2", CurveSetKind::Brake, 1),
+    ] {
+        train_dat.push(format!("#{section}"));
+        train_dat.extend(openbve_motor_rows(&tracks, mode, slot, max_speed)?);
+    }
+
+    let cursor = Cursor::new(Vec::new());
+    let mut zip = ZipWriter::new(cursor);
+    let file_options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+    let root = export_archive_names(document).root_name;
+    zip.start_file(format!("{root}/train.dat"), file_options)
+        .map_err(|error| error.to_string())?;
+    zip.write_all(&[0xEF, 0xBB, 0xBF])
+        .map_err(|error| error.to_string())?;
+    zip.write_all(train_dat.join("\r\n").as_bytes())
+        .map_err(|error| error.to_string())?;
+
+    let sound_cfg = std::iter::once("Version 1.0".to_string())
+        .chain(std::iter::once("[Motor]".to_string()))
+        .chain(
+            tracks
+                .iter()
+                .enumerate()
+                .map(|(index, _)| format!("{index} = motor{index}.wav")),
+        )
+        .collect::<Vec<_>>()
+        .join("\r\n");
+    zip.start_file(format!("{root}/sound.cfg"), file_options)
+        .map_err(|error| error.to_string())?;
+    zip.write_all(sound_cfg.as_bytes())
+        .map_err(|error| error.to_string())?;
+    for (index, track) in tracks.iter().enumerate() {
+        let bytes = encode_track_bytes(track, options.sample_rate, EncodedTrackMode::Wav)?;
+        zip.start_file(format!("{root}/motor{index}.wav"), file_options)
+            .map_err(|error| error.to_string())?;
+        zip.write_all(&bytes).map_err(|error| error.to_string())?;
+    }
+    zip.finish()
+        .map(|cursor| cursor.into_inner())
+        .map_err(|error| error.to_string())
+}
+
 #[cfg(target_os = "windows")]
 fn resolve_file_icon_path(app: &AppHandle) -> Option<PathBuf> {
     let resource_dir = app.path().resource_dir().ok()?;
@@ -1327,4 +1466,172 @@ pub fn export_mtr_project(
 
     let archive = create_mtr_archive(&document, &asset_payloads, &options)?;
     fs::write(output_path, archive).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn export_openbve_project(
+    document: ProjectDocument,
+    asset_payloads: HashMap<String, Vec<u8>>,
+    output_path: String,
+    options: OpenBveExportOptions,
+) -> Result<(), String> {
+    if options.format != "openbve" {
+        return Err(UNSUPPORTED_EXPORT_COMMAND_MESSAGE.to_string());
+    }
+    let archive = create_openbve_archive(&document, &asset_payloads, &options)?;
+    fs::write(output_path, archive).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod openbve_export_tests {
+    use super::*;
+
+    fn curve(kind: CurveKind, value: f64) -> TrackCurve {
+        TrackCurve {
+            kind,
+            interpolation: "linear".to_string(),
+            keyframes: vec![Keyframe {
+                id: "point".to_string(),
+                speed: 0.0,
+                value,
+            }],
+        }
+    }
+
+    fn exportable_track<'a>(
+        track: &'a Track,
+        asset: &'a AudioAsset,
+        bytes: &'a Vec<u8>,
+    ) -> ExportableTrack<'a> {
+        ExportableTrack {
+            track,
+            asset,
+            bytes,
+        }
+    }
+
+    fn track() -> Track {
+        let curves = TrackCurveSet {
+            pitch: curve(CurveKind::Pitch, 1.5),
+            volume: curve(CurveKind::Volume, 0.5),
+        };
+        Track {
+            id: "track".to_string(),
+            name: "motor".to_string(),
+            color: "#fff".to_string(),
+            asset_id: Some("asset".to_string()),
+            enabled: true,
+            mute: false,
+            curve_sets: HashMap::from([
+                (CurveSetKind::Traction, curves.clone()),
+                (CurveSetKind::Brake, curves),
+            ]),
+            locked: None,
+            visible: None,
+        }
+    }
+
+    fn asset() -> AudioAsset {
+        AudioAsset {
+            id: "asset".to_string(),
+            file_name: "motor.wav".to_string(),
+            original_path: None,
+            packaged_path: "Assets/motor.wav".to_string(),
+            format: "wav".to_string(),
+            size: 0,
+            checksum: None,
+            duration_sec: None,
+            sample_rate: None,
+            channels: None,
+        }
+    }
+
+    #[test]
+    fn motor_rows_convert_project_units_and_fill_unused_slot() {
+        let track = track();
+        let asset = asset();
+        let bytes = vec![];
+        let tracks = vec![exportable_track(&track, &asset, &bytes)];
+        assert_eq!(
+            openbve_motor_rows(&tracks, CurveSetKind::Traction, 0, 0.4).unwrap(),
+            vec!["0,150,64"; 3]
+        );
+        assert_eq!(
+            openbve_motor_rows(&tracks, CurveSetKind::Traction, 1, 0.4).unwrap(),
+            vec!["-1,100,0"; 3]
+        );
+    }
+
+    #[test]
+    fn motor_rows_reject_more_than_two_active_sounds() {
+        let tracks_data = vec![track(), track(), track()];
+        let asset = asset();
+        let bytes = vec![];
+        let tracks = tracks_data
+            .iter()
+            .map(|track| exportable_track(track, &asset, &bytes))
+            .collect::<Vec<_>>();
+        assert!(openbve_motor_rows(&tracks, CurveSetKind::Traction, 0, 0.0)
+            .unwrap_err()
+            .contains("at 0.0 km/h"));
+    }
+
+    #[test]
+    fn archive_contains_train_dat_sound_map_and_audio() {
+        let mut track = track();
+        track.id = "track-0".to_string();
+        let asset = asset();
+        let wav = encode_wav_pcm16(&DecodedAudio {
+            sample_rate: 44_100,
+            channels: vec![vec![0.0; 128]],
+        });
+        let document = ProjectDocument {
+            project: ProjectFile {
+                meta: ProjectMeta {
+                    id: "project".to_string(),
+                    name: "Test Train".to_string(),
+                    author: None,
+                    app_version: "1.3".to_string(),
+                    schema_version: 1,
+                    created_at: "".to_string(),
+                    updated_at: "".to_string(),
+                    max_speed: 0.4,
+                    acceleration: 1.2,
+                    brake_deceleration: 1.2,
+                    description: None,
+                    last_opened_at: None,
+                },
+            },
+            tracks: TracksFile {
+                active_track_id: None,
+                tracks: vec![track],
+                assets: vec![asset],
+            },
+        };
+        let bytes = create_openbve_archive(
+            &document,
+            &HashMap::from([("asset".to_string(), wav)]),
+            &OpenBveExportOptions {
+                format: "openbve".to_string(),
+                sample_rate: 44_100,
+            },
+        )
+        .unwrap();
+        let mut zip = ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut dat = String::new();
+        zip.by_name("Test Train/train.dat")
+            .unwrap()
+            .read_to_string(&mut dat)
+            .unwrap();
+        assert!(dat.starts_with("\u{feff}OPENBVE\r\n"));
+        assert!(dat.contains("#MOTOR_P1\r\n0,150,64\r\n"));
+        assert!(dat.contains("#MOTOR_B2\r\n-1,100,0\r\n"));
+        let mut cfg = String::new();
+        zip.by_name("Test Train/sound.cfg")
+            .unwrap()
+            .read_to_string(&mut cfg)
+            .unwrap();
+        assert!(cfg.contains("0 = motor0.wav"));
+        assert!(zip.by_name("Test Train/motor0.wav").unwrap().size() > 44);
+    }
 }

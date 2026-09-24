@@ -7,13 +7,13 @@ import {
   hasOggSourceTracks,
   type BveProjectExportOptions,
   type MtrProjectExportOptions,
+  type OpenBveProjectExportOptions,
   type ProjectExportFormat,
 } from "@/services/projectExport";
 import type { ID } from "@/types/common";
 import type { ProjectDocument } from "@/types/project";
 
-type PlaceholderExportFormat = "openbve";
-type ExportDialogFormat = ProjectExportFormat | PlaceholderExportFormat;
+type ExportDialogFormat = ProjectExportFormat;
 
 interface ExportFormatDefinition {
   value: ExportDialogFormat;
@@ -56,9 +56,9 @@ const exportFormats: ExportFormatDefinition[] = [
     defaultSuffix: "OpenBVE",
     dialogTitle: "Export Package",
     successMessage: "Export completed",
-    warningText: null,
+    warningText: "OpenBVE allows up to two simultaneous motor sounds in each mode. Vehicle parameters in train.dat use defaults; check them before installation. OGG audio will be converted to WAV.",
     supportsAttenuationDistance: false,
-    available: false,
+    available: true,
   },
   {
     value: "mtr",
@@ -102,6 +102,9 @@ const showOggWarning = computed(
     hasOggTracks.value &&
     selectedExportFormat.value.warningText !== null,
 );
+const showFormatWarning = computed(() =>
+  selectedExportFormat.value.value === "openbve" || showOggWarning.value,
+);
 const warningText = computed(() => selectedExportFormat.value.warningText);
 
 function ensureZipExtension(filePath: string): string {
@@ -126,7 +129,7 @@ async function runExport() {
 
   isExporting.value = true;
   try {
-    const options: BveProjectExportOptions | MtrProjectExportOptions =
+    const options: BveProjectExportOptions | MtrProjectExportOptions | OpenBveProjectExportOptions =
       formatConfig.value === "mtr"
         ? {
             format: "mtr",
@@ -134,7 +137,7 @@ async function runExport() {
             attenuationDistance: attenuationDistance.value,
           }
         : {
-            format: "bve",
+            format: formatConfig.value,
             sampleRate: sampleRate.value,
           };
 
@@ -209,7 +212,7 @@ async function runExport() {
         </select>
       </label>
 
-      <p v-if="showOggWarning && warningText" class="warning" role="status">
+      <p v-if="showFormatWarning && warningText" class="warning" role="status">
         {{ warningText }}
       </p>
       <p v-if="localError" class="error" role="alert">{{ localError }}</p>

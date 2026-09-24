@@ -22,7 +22,7 @@ export interface ImportedProjectResult {
   defaultProjectName: string;
 }
 
-type ImportEntryKind = "bve" | "mtr";
+type ImportEntryKind = "bve" | "mtr" | "openbve";
 type ImportErrorCode =
   | "unsupported-entry"
   | "missing-file"
@@ -111,8 +111,12 @@ export function isMtrSoundConfigPath(filePath: string): boolean {
   return fileNameFromPath(filePath).toLowerCase() === "sound.cfg";
 }
 
+export function isOpenBveTrainPath(filePath: string): boolean {
+  return fileNameFromPath(filePath).toLowerCase() === "train.dat";
+}
+
 export function isExternalImportPath(filePath: string): boolean {
-  return isVehicleConfigPath(filePath) || isMtrSoundConfigPath(filePath);
+  return isVehicleConfigPath(filePath) || isMtrSoundConfigPath(filePath) || isOpenBveTrainPath(filePath);
 }
 
 export async function importExternalProject(
@@ -120,9 +124,10 @@ export async function importExternalProject(
 ): Promise<ImportedProjectResult> {
   return measureAsync("external import total", async () => {
     const kind = detectImportEntryKind(entryPath);
-    const source =
-      kind === "bve"
-        ? await parseVehicleProject(entryPath)
+    const source = kind === "bve"
+      ? await parseVehicleProject(entryPath)
+      : kind === "openbve"
+        ? await parseOpenBveProject(entryPath)
         : await parseMtrProject(entryPath);
 
     return buildImportedProject(source);
@@ -132,6 +137,7 @@ export async function importExternalProject(
 function detectImportEntryKind(entryPath: string): ImportEntryKind {
   if (isVehicleConfigPath(entryPath)) return "bve";
   if (isMtrSoundConfigPath(entryPath)) return "mtr";
+  if (isOpenBveTrainPath(entryPath)) return "openbve";
 
   throw new ProjectImportError("unsupported-entry", entryPath);
 }
@@ -221,6 +227,97 @@ async function parseMtrProject(entryPath: string): Promise<ImportedSourceData> {
     tractionVolume: csvFiles[1],
     brakePitch: csvFiles[2],
     brakeVolume: csvFiles[3],
+  };
+}
+
+interface OpenBveMotorRow {
+  index: number;
+  pitch: number;
+  volume: number;
+}
+
+function parseOpenBveMotorSections(text: string): Map<string, OpenBveMotorRow[]> {
+  const lines = text.replace(/^\uFEFF/u, "").split(/\r?\n/u);
+  if (!/^(?:OPENBVE\d*|BVE\d+)$/iu.test((lines[0] ?? "").trim())) {
+    throw new ProjectImportError("invalid-config", "train.dat: identifier");
+  }
+  const sections = new Map<string, OpenBveMotorRow[]>();
+  let current: OpenBveMotorRow[] | null = null;
+  for (const raw of lines.slice(1)) {
+    const line = raw.split(";", 1)[0].trim();
+    if (line.startsWith("#")) {
+      const name = line.slice(1).trim().toUpperCase();
+      current = /^MOTOR_[PB][12]$/u.test(name) ? [] : null;
+      if (current) sections.set(name, current);
+      continue;
+    }
+    if (!current) continue;
+    if (current.length >= 10_000) throw new ProjectImportError("invalid-config", "train.dat: motor table too long");
+    const cells = line.split(",").map((cell) => cell.trim());
+    const index = cells[0] ? Number(cells[0]) : -1;
+    const pitch = cells[1] ? Number(cells[1]) : 100;
+    const volume = cells[2] ? Number(cells[2]) : 128;
+    if (!Number.isInteger(index) || index < -1 || !Number.isFinite(pitch) || pitch <= 0 || !Number.isFinite(volume) || volume < 0) {
+      throw new ProjectImportError("invalid-config", "train.dat: motor table");
+    }
+    current.push({ index, pitch, volume });
+  }
+  if (!["MOTOR_P1", "MOTOR_P2", "MOTOR_B1", "MOTOR_B2"].some((name) => sections.has(name))) {
+    throw new ProjectImportError("invalid-config", "train.dat: motor sections");
+  }
+  return sections;
+}
+
+function openBveCurveColumns(
+  sections: Map<string, OpenBveMotorRow[]>,
+  prefix: "P" | "B",
+  kind: CurveKind,
+  entries: MotorEntry[],
+  path: string,
+): ParsedMotorCsv {
+  const tables = [sections.get(`MOTOR_${prefix}1`) ?? [], sections.get(`MOTOR_${prefix}2`) ?? []];
+  const rows = Math.max(1, ...tables.map((table) => table.length));
+  const columns = entries.map((entry) => {
+    const points: ParsedMotorCsvPoint[] = [];
+    for (let row = 0; row < rows; row += 1) {
+      const matches = tables.map((table) => table[Math.min(row, table.length - 1)])
+        .filter((item): item is OpenBveMotorRow => !!item && item.index === entry.index);
+      const loudest = matches.sort((a, b) => b.volume - a.volume)[0];
+      points.push({
+        speed: row / 5,
+        value: kind === "pitch" ? (loudest?.pitch ?? 100) / 100 : (loudest?.volume ?? 0) / 128,
+      });
+    }
+    return points;
+  });
+  return { path, maxSpeed: (rows - 1) / 5, columns };
+}
+
+async function parseOpenBveProject(entryPath: string): Promise<ImportedSourceData> {
+  const sections = parseOpenBveMotorSections(await readTextWithFallback(entryPath));
+  const baseDir = dirname(entryPath);
+  const soundPath = resolveRelativePath(baseDir, "sound.cfg");
+  const soundSections = await canReadFile(soundPath)
+    ? parseIniSections(await readTextWithFallback(soundPath))
+    : null;
+  const mapped = soundSections?.get("motor")
+    ? parseMotorEntries(getRequiredSection(soundSections, "Motor"))
+    : [];
+  const audioByIndex = new Map(mapped.map((entry) => [entry.index, entry.fileName]));
+  const indices = new Set<number>();
+  for (const table of sections.values()) for (const row of table) if (row.index >= 0) indices.add(row.index);
+  if (indices.size === 0) throw new ProjectImportError("invalid-config", "train.dat: no motor sounds");
+  const motorEntries = [...indices].sort((a, b) => a - b)
+    .map((index) => ({ index, fileName: audioByIndex.get(index) ?? `motor${index}.wav` }));
+  return {
+    kind: "openbve",
+    defaultProjectName: fileNameFromPath(baseDir) || "imported_project",
+    audioBaseDir: baseDir,
+    motorEntries,
+    tractionPitch: openBveCurveColumns(sections, "P", "pitch", motorEntries, entryPath),
+    tractionVolume: openBveCurveColumns(sections, "P", "volume", motorEntries, entryPath),
+    brakePitch: openBveCurveColumns(sections, "B", "pitch", motorEntries, entryPath),
+    brakeVolume: openBveCurveColumns(sections, "B", "volume", motorEntries, entryPath),
   };
 }
 

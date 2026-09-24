@@ -395,10 +395,11 @@ async function browseImportFile() {
     multiple: false,
     directory: false,
     filters: [
-      { name: "Supported Import Files", extensions: ["msep", "txt", "cfg"] },
+      { name: "Supported Import Files", extensions: ["msep", "txt", "cfg", "dat"] },
       { name: "MSEP Project", extensions: ["msep"] },
       { name: "BVE Vehicle", extensions: ["txt"] },
       { name: "MTR Sound Config", extensions: ["cfg"] },
+      { name: "OpenBVE Train", extensions: ["dat"] },
     ],
   });
 

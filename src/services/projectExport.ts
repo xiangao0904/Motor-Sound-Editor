@@ -4,9 +4,10 @@ import type { AudioAsset, Track } from "@/types/track";
 import {
   exportNativeBveProject,
   exportNativeMtrProject,
+  exportNativeOpenBveProject,
 } from "@/services/nativeInterop";
 
-export type ProjectExportFormat = "bve" | "mtr";
+export type ProjectExportFormat = "bve" | "mtr" | "openbve";
 
 export interface BveProjectExportOptions {
   format: "bve";
@@ -19,9 +20,15 @@ export interface MtrProjectExportOptions {
   attenuationDistance: 16 | 32 | 64;
 }
 
+export interface OpenBveProjectExportOptions {
+  format: "openbve";
+  sampleRate: number;
+}
+
 export type ProjectExportOptions =
   | BveProjectExportOptions
-  | MtrProjectExportOptions;
+  | MtrProjectExportOptions
+  | OpenBveProjectExportOptions;
 
 interface ExportableTrack {
   track: Track;
@@ -70,6 +77,11 @@ export async function exportProjectPackage(
 
   if (options.format === "bve") {
     await exportNativeBveProject(document, assetPayloads, outputPath, options);
+    return;
+  }
+
+  if (options.format === "openbve") {
+    await exportNativeOpenBveProject(document, assetPayloads, outputPath, options);
     return;
   }
 

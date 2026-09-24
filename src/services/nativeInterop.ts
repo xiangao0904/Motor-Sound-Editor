@@ -43,7 +43,7 @@ export interface SampledTrackCurves {
   volume: number[];
 }
 
-export type NativeExportFormat = "bve" | "mtr";
+export type NativeExportFormat = "bve" | "mtr" | "openbve";
 
 export interface NativeBveExportOptions {
   format: "bve";
@@ -56,9 +56,15 @@ export interface NativeMtrExportOptions {
   attenuationDistance: 16 | 32 | 64;
 }
 
+export interface NativeOpenBveExportOptions {
+  format: "openbve";
+  sampleRate: number;
+}
+
 export type NativeExportOptions =
   | NativeBveExportOptions
-  | NativeMtrExportOptions;
+  | NativeMtrExportOptions
+  | NativeOpenBveExportOptions;
 
 export function serializePayloadMap(
   assetPayloads: Map<ID, Uint8Array>,
@@ -159,6 +165,20 @@ export async function exportNativeMtrProject(
   options: NativeMtrExportOptions,
 ): Promise<void> {
   await invoke("export_mtr_project", {
+    document: sanitizeProjectDocument(document),
+    assetPayloads: serializePayloadMap(assetPayloads),
+    outputPath,
+    options,
+  });
+}
+
+export async function exportNativeOpenBveProject(
+  document: ProjectDocument,
+  assetPayloads: Map<ID, Uint8Array>,
+  outputPath: string,
+  options: NativeOpenBveExportOptions,
+): Promise<void> {
+  await invoke("export_openbve_project", {
     document: sanitizeProjectDocument(document),
     assetPayloads: serializePayloadMap(assetPayloads),
     outputPath,

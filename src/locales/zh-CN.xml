@@ -31,7 +31,7 @@
   <text key="home.create">创建</text>
   <text key="home.onlyMsepOpen">只能打开 .msep 工程</text>
   <text key="home.onlyMsepImport">只能导入 .msep 工程</text>
-  <text key="home.onlySupportedImport">只能导入 .msep、vehicle.txt 或 sound.cfg 文件</text>
+  <text key="home.onlySupportedImport">只能导入 .msep、vehicle.txt、sound.cfg 或 train.dat 文件</text>
   <text key="home.projectCreatedFailed">工程创建失败</text>
   <text key="home.projectOpenFailed">工程打开失败</text>
   <text key="home.projectImportFailed">工程导入失败</text>
