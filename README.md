@@ -1,6 +1,8 @@
 # Motor Sound Editor (MSE)
 
-[![Version](https://img.shields.io/github/v/release/xiangao0904/Motor-Sound-Editor?label=version&style=flat-square&color=0078d4&logo=github)](https://github.com/xiangao0904/Motor-Sound-Editor/releases)
+[简体中文](./README.zh-CN.md)
+
+[![Version](https://img.shields.io/badge/version-1.3.0-0078d4?style=flat-square&logo=github)](https://github.com/xiangao0904/Motor-Sound-Editor/releases/tag/v1.3.0)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-brightgreen)
 ![Tech Stack](https://img.shields.io/badge/stack-Vue3%20|%20Tauri%20|%20Rust-orange)
 
@@ -52,7 +54,7 @@ pnpm build
 pnpm tauri build
 ```
 
-The `Build macOS` GitHub Actions workflow can be started manually. Pushing a tag such as `v1.2.1` also builds the Universal DMG and ZIP packages and attaches them to the corresponding GitHub Release.
+The `Build macOS` GitHub Actions workflow can be started manually. Pushing a tag such as `v1.3.0` also builds the Universal DMG and ZIP packages and attaches them to the corresponding GitHub Release.
 
 ## Project Format
 

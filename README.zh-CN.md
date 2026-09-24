@@ -1,6 +1,8 @@
 # Motor Sound Editor (MSE)
 
-![Version](https://img.shields.io/github/v/release/xiangao0904/Motor-Sound-Editor?label=version&style=flat-square&color=0078d4&logo=github)
+[English](./README.md)
+
+[![Version](https://img.shields.io/badge/version-1.3.0-0078d4?style=flat-square&logo=github)](https://github.com/xiangao0904/Motor-Sound-Editor/releases/tag/v1.3.0)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-brightgreen)
 ![Tech Stack](https://img.shields.io/badge/stack-Vue3%20|%20Tauri%20|%20Rust-orange)
 
@@ -52,7 +54,7 @@ pnpm build
 pnpm tauri build
 ```
 
-可以在 GitHub Actions 中手动运行 `Build macOS` 工作流。推送 `v1.2.1` 这类版本标签时，工作流还会构建 Universal DMG 和 ZIP，并将文件附加到对应的 GitHub Release。
+可以在 GitHub Actions 中手动运行 `Build macOS` 工作流。推送 `v1.3.0` 这类版本标签时，工作流还会构建 Universal DMG 和 ZIP，并将文件附加到对应的 GitHub Release。
 
 ## 工程格式
 
