@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import ExportDialog from "@/components/ExportDialog.vue";
 import HomePage from "@/pages/HomePage.vue";
 import EditorPage from "@/pages/EditorPage.vue";
+import AudioEditorPage from "@/pages/AudioEditorPage.vue";
 import {
   ensureMsepExtension,
   isMsepPath,
@@ -25,10 +26,11 @@ import { useProjectStore } from "@/stores/project";
 import { useRecentProjectsStore } from "@/stores/recentProjects";
 import { createProjectPreview } from "@/utils/projectPreview";
 
-type AppView = "home" | "editor";
+type AppView = "home" | "editor" | "audio-editor";
 type PendingExitAction = "home" | "close";
 
 const currentView = ref<AppView>("home");
+const audioEditorTarget = ref<{ trackId: string; assetId: string } | null>(null);
 const pendingExitAction = ref<PendingExitAction | null>(null);
 const isSavingBeforeExit = ref(false);
 const isExportDialogOpen = ref(false);
@@ -82,13 +84,26 @@ function openEditor() {
     "Open project",
     projectStore.document,
     editorStore.runtime,
+    assetPayloadStore.payloads,
   );
   currentView.value = "editor";
 }
 
 function finishReturnHome() {
   editorStore.pause();
+  audioEditorTarget.value = null;
   currentView.value = "home";
+}
+
+function openAudioEditor(payload: { trackId: string; assetId: string }) {
+  editorStore.pause();
+  audioEditorTarget.value = payload;
+  currentView.value = "audio-editor";
+}
+
+function returnFromAudioEditor() {
+  audioEditorTarget.value = null;
+  currentView.value = "editor";
 }
 
 function requestReturnHome() {
@@ -192,12 +207,17 @@ function applyUndo() {
   const document = projectStore.document;
   if (!document || currentView.value !== "editor") return;
 
-  const snapshot = historyStore.undo(document, editorStore.runtime);
+  const snapshot = historyStore.undo(
+    document,
+    editorStore.runtime,
+    assetPayloadStore.payloads,
+  );
   if (!snapshot) {
     notificationStore.showToast(i18n.t("app.nothingUndo"));
     return;
   }
 
+  assetPayloadStore.replaceAll(snapshot.assetPayloads);
   projectStore.replaceDocument(
     restoreDocumentObjectUrls(snapshot.document, assetPayloadStore.payloads),
   );
@@ -209,12 +229,17 @@ function applyRedo() {
   const document = projectStore.document;
   if (!document || currentView.value !== "editor") return;
 
-  const snapshot = historyStore.redo(document, editorStore.runtime);
+  const snapshot = historyStore.redo(
+    document,
+    editorStore.runtime,
+    assetPayloadStore.payloads,
+  );
   if (!snapshot) {
     notificationStore.showToast(i18n.t("app.nothingRedo"));
     return;
   }
 
+  assetPayloadStore.replaceAll(snapshot.assetPayloads);
   projectStore.replaceDocument(
     restoreDocumentObjectUrls(snapshot.document, assetPayloadStore.payloads),
   );
@@ -391,11 +416,29 @@ onBeforeUnmount(() => {
 <template>
   <HomePage v-if="currentView === 'home'" @open-editor="openEditor" />
   <EditorPage
-    v-else-if="hasProject"
+    v-else-if="currentView === 'editor' && hasProject"
     @return-home="requestReturnHome"
     @project-closed="requestReturnHome"
     @save-project="() => void persistProject(false)"
     @export-project="openExportDialog"
+    @edit-audio="openAudioEditor"
+  />
+  <AudioEditorPage
+    v-else-if="currentView === 'audio-editor' && hasProject && audioEditorTarget"
+    :track-id="audioEditorTarget.trackId"
+    :asset-id="audioEditorTarget.assetId"
+    @return-editor="returnFromAudioEditor"
+    @saved="
+      () => {
+        historyStore.pushSnapshot(
+          'Edit audio',
+          projectStore.document,
+          editorStore.runtime,
+          assetPayloadStore.payloads,
+        );
+        notificationStore.showToast('Audio saved to project');
+      }
+    "
   />
   <HomePage v-else @open-editor="openEditor" />
   <ExportDialog

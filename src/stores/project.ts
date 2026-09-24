@@ -411,6 +411,24 @@ export const useProjectStore = defineStore("project", () => {
     markDirty();
   }
 
+  function updateAsset(
+    assetId: ID,
+    patch: Partial<
+      Pick<
+        AudioAsset,
+        "size" | "durationSec" | "sampleRate" | "channels" | "format" | "fileName" | "packagedPath"
+      >
+    >,
+  ) {
+    if (!document.value) return;
+
+    const asset = document.value.tracks.assets.find((item) => item.id === assetId);
+    if (!asset) return;
+
+    Object.assign(asset, patch);
+    markDirty();
+  }
+
   function addKeyframe(
     trackId: ID,
     curveSet: CurveSetKind,
@@ -571,6 +589,7 @@ export const useProjectStore = defineStore("project", () => {
     setTrackAsset,
     addAsset,
     removeAsset,
+    updateAsset,
     addKeyframe,
     updateKeyframe,
     moveKeyframeDraft,
