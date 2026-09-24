@@ -54,7 +54,6 @@ pnpm build
 pnpm tauri build
 ```
 
-可以在 GitHub Actions 中手动运行 `Build macOS` 工作流。推送 `v1.3.0` 这类版本标签时，工作流还会构建 Universal DMG 和 ZIP，并将文件附加到对应的 GitHub Release。
 
 ## 工程格式
 

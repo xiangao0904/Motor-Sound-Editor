@@ -54,7 +54,6 @@ pnpm build
 pnpm tauri build
 ```
 
-The `Build macOS` GitHub Actions workflow can be started manually. Pushing a tag such as `v1.3.0` also builds the Universal DMG and ZIP packages and attaches them to the corresponding GitHub Release.
 
 ## Project Format
 
