@@ -13,12 +13,12 @@ Motor Sound Editor lets you design layered motor sound projects in a visual edit
 
 ### Operating system
 
-**Windows** is the primary supported platform today.
+Motor Sound Editor supports **Windows** and **macOS**.
 
 ### Download and install
 
-- **Get the app**: Download the current Windows installer directly from [this release link](https://github.com/xiangao0904/Motor-Sound-Editor/releases).
-- **Quick install**: After downloading, run the installer. No extra runtime setup is required because the Tauri dependencies are already bundled with the app.
+- **Get the app**: Open the [releases page](https://github.com/xiangao0904/Motor-Sound-Editor/releases) and download the latest installer for Windows or macOS.
+- **Install**: Open the downloaded package and follow the installation prompts for your operating system.
 
 ### Example files
 

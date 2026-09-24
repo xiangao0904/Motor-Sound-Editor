@@ -13,12 +13,12 @@ Motor Sound Editor 让你在可视化编辑器中创作分层电机音效，主�
 
 ### 操作系统要求
 
-**Windows** 是目前软件的主要支持平台。
+Motor Sound Editor 目前支持 **Windows** 和 **macOS**。
 
 ### 下载与安装
 
-- **获取软件**：你可以直接通过[这个链接](https://github.com/xiangao0904/Motor-Sound-Editor/releases)下载当前 Windows 安装程序。
-- **快速安装**：下载完成后，运行安装程序即可。无需额外安装运行库，Tauri 所需组件已随应用打包。
+- **获取软件**：前往[发布页面](https://github.com/xiangao0904/Motor-Sound-Editor/releases)，下载适用于 Windows 或 macOS 的最新安装包。
+- **安装软件**：打开下载好的安装包，按照对应操作系统的提示完成安装。
 
 ### 示例文件
 
