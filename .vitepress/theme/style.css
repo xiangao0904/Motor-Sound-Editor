@@ -523,6 +523,10 @@ a,
   letter-spacing: -0.05em;
 }
 
+.vp-doc h1 {
+  line-height: 1.28;
+}
+
 .download-panel h1 {
   margin: 0;
   font-family: var(--mse-font-display);
