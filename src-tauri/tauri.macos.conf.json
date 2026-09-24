@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "Motor Sound Editor",
+        "width": 1376,
+        "height": 768,
+        "minWidth": 880,
+        "minHeight": 620,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 20,
+          "y": 26
+        }
+      }
+    ]
+  },
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    }
+  }
+}

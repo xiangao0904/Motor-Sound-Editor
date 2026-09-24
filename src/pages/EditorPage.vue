@@ -319,7 +319,10 @@ function isShiftPressed(event: Event) {
 }
 
 function isCtrlPressed(event: Event) {
-  return "ctrlKey" in event && event.ctrlKey === true;
+  return (
+    ("ctrlKey" in event && event.ctrlKey === true) ||
+    ("metaKey" in event && event.metaKey === true)
+  );
 }
 
 type SnapMode = "none" | "step" | "grid";
@@ -564,7 +567,7 @@ function handleChartWorkspaceScroll(event: Event) {
 function handleChartWorkspaceWheel(event: WheelEvent) {
   const container = event.currentTarget as HTMLDivElement;
 
-  if (event.ctrlKey) {
+  if (event.ctrlKey || event.metaKey) {
     event.preventDefault();
 
     const oldZoom = clamp(

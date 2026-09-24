@@ -1256,8 +1256,7 @@ pub fn read_msep_modified_at(path: String) -> Result<u64, String> {
     Ok(duration.as_millis() as u64)
 }
 
-#[tauri::command]
-pub fn startup_msep_path() -> Option<String> {
+pub fn startup_msep_path_from_args() -> Option<String> {
     msep_path_from_args(std::env::args())
 }
 

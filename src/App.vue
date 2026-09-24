@@ -503,6 +503,14 @@ onBeforeUnmount(() => {
   -webkit-text-size-adjust: 100%;
 }
 
+html[data-platform="macos"] {
+  --app-titlebar-padding: 0 20px 0 92px;
+}
+
+html[data-platform="macos"] .window-controls {
+  display: none;
+}
+
 * {
   box-sizing: border-box;
   scrollbar-color: #526a7b rgba(13, 20, 25, 0.22);
