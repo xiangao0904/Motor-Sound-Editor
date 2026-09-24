@@ -1,11 +1,9 @@
 ---
-title: Audio Editor (v1.3)
+title: Audio Editor
 description: Edit loops, flatten pitch, and reduce selected spectral content.
 ---
 
-# Audio Editor (v1.3)
-
-> This page describes v1.3 features under development. The tutorial has not been updated yet.
+# Audio Editor
 
 Select a track with assigned audio in the project editor and open **Audio Editor**. After editing, click **Save to Project** to replace that track's audio in the project, then save the `.msep` file. Undo and Redo step through audio edits. `Space` plays or pauses the current preview, except while typing in an input field.
 

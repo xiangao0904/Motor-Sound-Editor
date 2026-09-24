@@ -15,7 +15,7 @@ The left sidebar is the main action area for starting or resuming work:
 
 - **New Project** opens the new-project dialog and creates a fresh working document.
 - **Open File** opens an existing `.msep` file from disk.
-- **Import File** accepts `.msep`, BVE `vehicle.txt`, MTR `sound.cfg`, and OpenBVE `train.dat` in v1.3. You can also drop these files onto Home.
+- **Import File** accepts `.msep`, BVE `vehicle.txt`, MTR `sound.cfg`, and OpenBVE `train.dat`. You can also drop these files onto Home.
 - **Settings** changes the interface language, keyframe snapping steps, and chart grid line counts.
 
 An external import reads the referenced curves and audio and asks where to save an editable `.msep` project. For `train.dat`, it imports the four `#MOTOR_*` sound tables and their audio. Other vehicle parameters are not preserved as editable project data. Missing audio is reported by filename, while the curve data can still be imported.

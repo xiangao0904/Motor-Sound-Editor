@@ -5,7 +5,7 @@ description: 安装 Motor Sound Editor，创建首个 BVE 或 openBVE 电机音�
 
 # 快速开始
 
-Motor Sound Editor 面向希望在可视化编辑器中创作分层电机音效的用户，而不是手工维护原始模拟器表格。当前版本重点覆盖桌面应用里已经落地的三类核心流程：项目创作、实时预览与导出打包。
+Motor Sound Editor 让你在可视化编辑器中创作分层电机音效，主要流程包括项目创作、实时预览与导出打包。
 
 ![Motor Sound Editor 首页](/homepage.png)
 

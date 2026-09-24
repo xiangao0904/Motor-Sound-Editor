@@ -41,6 +41,6 @@ Tracks and curve data are bound tightly but remain isolated from one another:
 - **Separated data**: every track stores its own **Traction** and **Brake** pitch/volume curves.
 - **Independent editing**: editing keyframes on track A does not affect track B.
 
-## 5. Source audio editing (v1.3)
+## 5. Source audio editing
 
 Select a track with assigned audio and open the dedicated [Audio Editor](/docs/guide/audio-editor) to work on loop joins, pitch contours, and selected frequencies. Click **Save to Project** to write the processed audio back to the track, then save the `.msep` project.

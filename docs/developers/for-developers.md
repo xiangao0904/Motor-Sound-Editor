@@ -5,7 +5,7 @@ description: Developer-oriented entry points for understanding Motor Sound Edito
 
 # For Developers
 
-In v1.3, project curve editing and source audio processing live on separate pages. The frontend parses OpenBVE `train.dat` imports; Rust builds the export ZIP and audio files.
+Project curve editing and source audio processing live on separate pages. The frontend parses OpenBVE `train.dat` imports; Rust builds the export ZIP and audio files.
 
 If you want to understand the current implementation path, start here:
 

@@ -20,8 +20,8 @@ I first got my hands dirty at the end of April 2024. I sketched a few rough UI d
 
 In January 2025, I dusted the idea off again, this time switching to Avalonia UI. It was noticeably more comfortable to work with than WPF—the CSS-like styling system and data binding were much more to my taste.
 
-![Avalonia UI version under development](/docs/ava.png)
-<p style="text-align:center">Avalonia UI version under development</p>
+![Early Avalonia UI prototype](/docs/ava.png)
+<p style="text-align:center">Early Avalonia UI prototype</p>
 
 But before long, a new problem emerged. While the UI was more flexible, the whole .NET and C# development paradigm—MVVM and all that—always felt like using a sledgehammer to crack a nut for a small tool like mine. My productivity never really took off, and the process of fighting with rough edges became draining. I dragged on until even the motivation to open the project dried up, and so it was left to gather dust once again (the related code lives in the old repository [`BVE5-Motor-Assistance`](https://github.com/xiangao0904/BVE5-Motor-Assistance)).
 

@@ -5,8 +5,6 @@ description: Export motor sound projects for BVE, OpenBVE, and MTR.
 
 # Export Workflow
 
-> This page includes features under development for v1.3. Check the download page for the current public release.
-
 Open **Export Package** from the editor or a project card, choose a format and sample rate, then save the ZIP archive.
 
 ## Included tracks

@@ -15,7 +15,7 @@ description: 在 Motor Sound Editor 首页完成 BVE 列车音效项目的新建
 
 - **新建项目 New Project**：打开新建项目弹窗，并创建新的工作文档。
 - **打开文件 Open File**：从磁盘打开已有 `.msep` 文件。
-- **导入文件 Import File**：支持 `.msep`、BVE 的 `vehicle.txt`、MTR 的 `sound.cfg`，以及 1.3 中的 OpenBVE `train.dat`。也可将这些文件拖入首页。
+- **导入文件 Import File**：支持 `.msep`、BVE 的 `vehicle.txt`、MTR 的 `sound.cfg`，以及 OpenBVE 的 `train.dat`。也可将这些文件拖入首页。
 - **设置 Settings**：调整界面语言、关键帧吸附步长和图表网格线数量。
 
 导入外部格式时，应用会读取入口文件所引用的曲线及音频，然后要求选择保存位置，创建可继续编辑的 `.msep` 工程。导入 `train.dat` 只提取四组 `#MOTOR_*` 电机音表和对应音频；车辆动力、制动等参数不会作为可编辑项目字段完整保留。音频缺失时会提示文件名，曲线仍可导入。

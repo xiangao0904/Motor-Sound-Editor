@@ -1,6 +1,6 @@
 ﻿---
 title: FAQ
-description: Find answers about project formats, editor limits, playback behavior, and current export capabilities in Motor Sound Editor.
+description: Find answers about project formats, editor limits, playback behavior, and export capabilities in Motor Sound Editor.
 ---
 
 # FAQ
@@ -11,14 +11,14 @@ description: Find answers about project formats, editor limits, playback behavio
 
 ## Which audio formats can I assign to tracks?
 
-The current version supports:
+Supported formats:
 
 - `wav`
 - `ogg`
 
 ## Why does the interface show traction, coasting, and brake if only traction and brake curves are editable?
 
-The preview system exposes three simulator states, but the current authoring model stores only dedicated traction and brake curve sets. In the current version, coasting still previews through the traction-side curves.
+The preview system offers three simulator states. The project stores traction and brake curve sets, and coasting previews through the traction curves.
 
 ## Can I preview multiple tracks at the same time?
 
@@ -38,7 +38,7 @@ Settings on the Home screen includes language, keyframe snapping steps, and char
 
 ## Which export targets work right now?
 
-The v1.3 documentation covers BVE, MTR, and OpenBVE. OpenBVE exports `train.dat`, `sound.cfg`, and WAV files, with at most two audible tracks per speed and mode. See [Export Workflow](/docs/guide/export).
+The app exports BVE, MTR, and OpenBVE formats. OpenBVE packages contain `train.dat`, `sound.cfg`, and WAV files, with at most two audible tracks per speed and mode. See [Export Workflow](/docs/guide/export).
 
 ## Does `train.dat` import preserve vehicle parameters?
 

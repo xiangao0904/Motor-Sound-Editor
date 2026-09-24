@@ -5,7 +5,7 @@ description: Get started with Motor Sound Editor for BVE and openBVE by installi
 
 # Getting Started
 
-Motor Sound Editor is built for creators who want to design layered motor sound projects in a visual editor instead of hand-maintaining raw simulator tables. The current version is focused on three core workflows already implemented in the desktop app: project authoring, real-time preview, and export packaging.
+Motor Sound Editor lets you design layered motor sound projects in a visual editor. Its main workflows are project authoring, real-time preview, and export packaging.
 
 ![Motor Sound Editor home screen](/homepage.png)
 
