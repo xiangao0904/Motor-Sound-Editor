@@ -1,41 +1,34 @@
-﻿---
+---
 title: Export Workflow
-description: Prepare, validate, and export a Motor Sound Editor project as a BVE-ready package with the right sample-rate and conversion settings.
+description: Export motor sound projects for BVE, OpenBVE, and MTR.
 ---
 
 # Export Workflow
 
-After you finish editing tracks and adjusting curves, you can export the current project as a packaged output for the target simulator workflow.
+> This page includes features under development for v1.3. Check the download page for the current public release.
 
-## 1. Checks before export
+Open **Export Package** from the editor or a project card, choose a format and sample rate, then save the ZIP archive.
 
-Before exporting, make sure that:
+## Included tracks
 
-- **Eligible tracks exist**: the export engine only processes tracks that are **enabled**, **unmuted**, and **assigned an audio asset**.
-- **At least one exportable track is valid**: if every exportable track is missing audio, the export step fails immediately.
+Export includes tracks that are enabled, unmuted, and assigned audio. At least one such track is required. Hiding a track in the editor does not exclude it from export.
 
-## 2. Export dialog
+## Package formats
 
-![Project export](/docs/export.png)
+| Format | Main files | Purpose |
+| --- | --- | --- |
+| BVE | `vehicle.txt`, `motornoise/motornoise.txt`, four CSV tables, `sound/Sound.txt`, WAV | BVE motor sound data |
+| OpenBVE | `train.dat`, `sound.cfg`, `motor0.wav`, etc. | OpenBVE `train.dat` motor sound tables |
+| MTR | `sounds.json`, `sound.cfg`, four CSV tables, OGG | MTR sound resources |
 
-When you click the export button, the app opens the **Export File** dialog. This is where you choose the output format and audio options.
+OpenBVE uses `#MOTOR_P1`, `#MOTOR_P2`, `#MOTOR_B1`, and `#MOTOR_B2` in `train.dat`. Each row covers a 0.2 km/h speed step and contains a sound index, pitch, and volume. The `[Motor]` section in `sound.cfg` maps indices to WAV files. See the [official train.dat reference](https://openbve-project.net/documentation_hugo/en/trains/train_dat.html) and [sound.cfg reference](https://openbve-project.net/documentation_hugo/en/trains/sound_cfg.html).
 
-## 3. Export format
+OpenBVE has two simultaneous motor sound slots for traction and two for braking. Export checks active tracks at every speed step and reports the speed if more than two are audible in either mode. Tracks may alternate across speed ranges. Project pitch multipliers are written as percentages (`×100`); project volumes are written on the nominal 128 scale. OpenBVE's effective loudness also depends on train performance parameters.
 
-- **BVE** is the only active export target today. The app packages the result as a standard **ZIP archive**, for example `[ProjectName]-BVE.zip`.
-- **OpenBVE / MTR** still appear in the menu as disabled placeholders for future expansion.
+The exported `train.dat` contains default vehicle parameters so the file can be parsed. Review acceleration, braking, car, and cab settings against your actual train before use. For an existing train, merge the four `#MOTOR_*` sections, `sound.cfg` motor entries, and WAV files into its folder.
 
-## 4. Sample rate
+## Audio options
 
-You can choose a global sample rate for exported audio.
+Available sample rates are `22050`, `32000`, `44100`, `48000`, and `96000 Hz`; the default is `44100 Hz`. BVE and OpenBVE export WAV and convert OGG sources automatically. MTR exports OGG and offers attenuation distances of `16`, `32`, or `64`.
 
-- Available values are `22050 Hz`, `32000 Hz`, `44100 Hz`, `48000 Hz`, and `96000 Hz`.
-- `44100 Hz` is usually the practical default because it balances audio quality and file size well.
-
-## 5. Format conversion and automatic adaptation
-
-Motor Sound Editor can import both `.ogg` and `.wav` audio. During export, the app performs any required conversion automatically so the output matches the target format.
-
-For example, if the project contains `.ogg` audio and the export target requires WAV, the dialog shows a warning message explaining that OGG files will be converted to WAV during export.
-
-You do not need to transcode files manually. Once the settings look correct, click **Export** to finish the package.
+Keep the `.msep` file to continue editing later.

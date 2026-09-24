@@ -32,13 +32,17 @@ No. In the current implementation, preview uses only tracks that are enabled, un
 
 No. Save and Save As clean up unreferenced audio, so replaced files do not keep accumulating inside the `.msep` project.
 
-## Is there a finished settings page?
+## Which settings can I change?
 
-No. The codebase already has settings storage, but the current user-facing build does not include a finished settings screen.
+Settings on the Home screen includes language, keyframe snapping steps, and chart grid line counts.
 
 ## Which export targets work right now?
 
-In the current export dialog, only BVE is available. Other targets are visible but cannot be selected.
+The v1.3 documentation covers BVE, MTR, and OpenBVE. OpenBVE exports `train.dat`, `sound.cfg`, and WAV files, with at most two audible tracks per speed and mode. See [Export Workflow](/docs/guide/export).
+
+## Does `train.dat` import preserve vehicle parameters?
+
+It imports the motor sound tables and audio. Acceleration and other train parameters are not preserved in the editable project. The exported `train.dat` uses defaults that should be checked before use.
 
 ## Can I rely on export output only and skip saving the `.msep` file?
 

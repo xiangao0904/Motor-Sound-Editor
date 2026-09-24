@@ -7,6 +7,8 @@ description: Read the Motor Sound Editor manual for BVE and openBVE motor sound 
 
 Motor Sound Editor is a desktop editor focused on BVE and openBVE motor sound production. It combines visual curve editing, track-based audio assignment, real-time preview, and export packaging into one train sound editor workflow. These docs are written for end users who want to create, edit, review, and export projects with confidence.
 
+The v1.3 documentation also covers the dedicated [Audio Editor](/docs/guide/audio-editor), spectral editing, and OpenBVE `train.dat` import/export. These features are under development; the tutorial has not been updated yet.
+
 
 <div class="docs-grid">
   <article class="docs-card">

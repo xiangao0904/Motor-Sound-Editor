@@ -5,7 +5,7 @@ description: Learn how the Motor Sound Editor interface supports BVE train sound
 
 # Interface Overview
 
-Motor Sound Editor separates project management from project editing on purpose. The workflow becomes easier to understand when you treat the app as two main spaces: the Home screen for managing projects, and the editor for shaping sound.
+Motor Sound Editor has a Home screen, a project editor, and a dedicated Audio Editor. Use them to manage projects, shape speed curves, and edit audio sources respectively.
 
 ## Home: project lifecycle management
 
@@ -33,3 +33,4 @@ After this page, continue with:
 
 1. [Home and Projects](/docs/guide/home)
 2. [Editor Workspace](/docs/guide/editor)
+3. [Audio Editor](/docs/guide/audio-editor)

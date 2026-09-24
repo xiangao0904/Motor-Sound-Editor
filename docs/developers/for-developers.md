@@ -5,7 +5,7 @@ description: Developer-oriented entry points for understanding Motor Sound Edito
 
 # For Developers
 
-This page is still being organized.
+In v1.3, project curve editing and source audio processing live on separate pages. The frontend parses OpenBVE `train.dat` imports; Rust builds the export ZIP and audio files.
 
 If you want to understand the current implementation path, start here:
 
@@ -13,4 +13,6 @@ If you want to understand the current implementation path, start here:
 - `src/pages/HomePage.vue`: project creation, opening, and import logic on the Home screen.
 - `src/pages/EditorPage.vue`: the editor workspace, list editor, and project details dialog.
 - `src/services/audioPreview.ts`: real-time preview logic.
-- `src/services/bveExport.ts` and `src-tauri/src/native.rs`: export workflow.
+- `src/pages/AudioEditorPage.vue` and `src/pages/SpectralEditorPanel.vue`: loop, pitch, and spectral tools.
+- `src/services/projectImport.ts`: BVE, MTR, and OpenBVE import.
+- `src/services/projectExport.ts`, `src/services/nativeInterop.ts`, and `src-tauri/src/native.rs`: export checks, Tauri calls, and packaging.

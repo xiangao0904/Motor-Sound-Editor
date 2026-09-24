@@ -5,7 +5,7 @@ description: 在深入单个工具前，先理解 Motor Sound Editor 如何支�
 
 # 界面总览
 
-Motor Sound Editor 将项目管理与工程编辑明确拆分成两个主要空间，以保持工作流清晰：先在首页管理项目，再进入编辑器完成声音创作。
+Motor Sound Editor 有首页、项目编辑器和专用音频编辑器。首页管理工程，项目编辑器调整轨道与速度曲线，音频编辑器处理音源本身。
 
 ## 首页（Home）：项目生命周期管理
 
@@ -33,3 +33,4 @@ Motor Sound Editor 将项目管理与工程编辑明确拆分成两个主要空�
 
 1. [首页](/zh/docs/guide/home)
 2. [编辑器工作区](/zh/docs/guide/editor)
+3. [音频编辑器](/zh/docs/guide/audio-editor)

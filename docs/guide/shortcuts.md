@@ -20,6 +20,11 @@ The following shortcuts are available in the editor page:
 - `Ctrl+D`: Clear current selection
 - `Delete`: Delete the selected keyframe point(s)
 
+## Audio Editor
+
+- `Space`: Play or pause the current audio preview. It does not trigger while typing in an input field.
+- Use the Audio Editor's Undo and Redo buttons to step through applied audio edits.
+
 ## Drive Mode Shortcuts
 
 Quickly switch the current simulation drive state:

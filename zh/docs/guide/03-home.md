@@ -5,7 +5,7 @@ description: 在 Motor Sound Editor 首页完成 BVE 列车音效项目的新建
 
 # 首页
 
-首页（Home）是你的项目中枢。你可以在这里创建新工作、重新打开已有文件、导入外部 `.msep` 文件，以及浏览最近项目。
+首页用于新建、打开和管理项目，也可导入 BVE、MTR 与 OpenBVE 的电机音效数据。
 
 ![Motor Sound Editor 首页项目画廊](/homepage.png)
 
@@ -15,8 +15,10 @@ description: 在 Motor Sound Editor 首页完成 BVE 列车音效项目的新建
 
 - **新建项目 New Project**：打开新建项目弹窗，并创建新的工作文档。
 - **打开文件 Open File**：从磁盘打开已有 `.msep` 文件。
-- **导入文件 Import File**：通过应用的导入流程引入 `.msep` 文件，也可以将 `.msep` 直接拖入首页完成导入。
-- **设置 Settings**：当前版本尚未提供完成版设置界面。
+- **导入文件 Import File**：支持 `.msep`、BVE 的 `vehicle.txt`、MTR 的 `sound.cfg`，以及 1.3 中的 OpenBVE `train.dat`。也可将这些文件拖入首页。
+- **设置 Settings**：调整界面语言、关键帧吸附步长和图表网格线数量。
+
+导入外部格式时，应用会读取入口文件所引用的曲线及音频，然后要求选择保存位置，创建可继续编辑的 `.msep` 工程。导入 `train.dat` 只提取四组 `#MOTOR_*` 电机音表和对应音频；车辆动力、制动等参数不会作为可编辑项目字段完整保留。音频缺失时会提示文件名，曲线仍可导入。
 
 ## 最近项目区域
 
