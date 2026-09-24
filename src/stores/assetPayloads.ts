@@ -28,11 +28,21 @@ export const useAssetPayloadStore = defineStore("assetPayloads", () => {
     payloads.value = new Map();
   }
 
+  function replaceAll(nextPayloads: Map<ID, Uint8Array>) {
+    payloads.value = new Map(
+      [...nextPayloads.entries()].map(([assetId, bytes]) => [
+        assetId,
+        new Uint8Array(bytes),
+      ]),
+    );
+  }
+
   return {
     payloads,
     setPayload,
     getPayload,
     removePayload,
+    replaceAll,
     clear,
   };
 });

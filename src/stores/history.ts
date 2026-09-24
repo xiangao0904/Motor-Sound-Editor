@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import type { EditorRuntimeState } from "@/types/editor";
 import type { HistorySnapshot } from "@/types/history";
 import type { ProjectDocument } from "@/types/project";
+import type { ID } from "@/types/common";
 import {
   sanitizeEditorRuntime,
   sanitizeProjectDocument,
@@ -43,12 +44,19 @@ export const useHistoryStore = defineStore("history", () => {
     label: string,
     document: ProjectDocument,
     editor: EditorRuntimeState,
+    assetPayloads: Map<ID, Uint8Array>,
   ): HistorySnapshot {
     return {
       label,
       timestamp: Date.now(),
       document: sanitizeProjectDocument(document),
       editor: sanitizeEditorRuntime(editor),
+      assetPayloads: new Map(
+        [...assetPayloads.entries()].map(([assetId, bytes]) => [
+          assetId,
+          new Uint8Array(bytes),
+        ]),
+      ),
     };
   }
 
@@ -56,11 +64,12 @@ export const useHistoryStore = defineStore("history", () => {
     label: string,
     document: ProjectDocument | null,
     editor: EditorRuntimeState,
+    assetPayloads: Map<ID, Uint8Array> = new Map(),
   ) {
     if (!document) return;
 
     try {
-      const snapshot = createSnapshot(label, document, editor);
+      const snapshot = createSnapshot(label, document, editor, assetPayloads);
       undoStack.value.push(snapshot);
     } catch (error) {
       console.error("History snapshot failed", error);
@@ -78,12 +87,13 @@ export const useHistoryStore = defineStore("history", () => {
     label: string,
     document: ProjectDocument | null,
     editor: EditorRuntimeState,
+    assetPayloads: Map<ID, Uint8Array> = new Map(),
     debounceMs = 250,
   ) {
     cancelPendingSnapshot();
 
     debounceTimer = window.setTimeout(() => {
-      pushSnapshot(label, document, editor);
+      pushSnapshot(label, document, editor, assetPayloads);
       debounceTimer = null;
     }, debounceMs);
   }
@@ -91,6 +101,7 @@ export const useHistoryStore = defineStore("history", () => {
   function undo(
     currentDocument: ProjectDocument,
     currentEditor: EditorRuntimeState,
+    currentAssetPayloads: Map<ID, Uint8Array>,
   ) {
     cancelPendingSnapshot();
 
@@ -100,6 +111,7 @@ export const useHistoryStore = defineStore("history", () => {
       "current",
       currentDocument,
       currentEditor,
+      currentAssetPayloads,
     );
     const popped = undoStack.value.pop();
     if (!popped) return null;
@@ -112,6 +124,7 @@ export const useHistoryStore = defineStore("history", () => {
     return {
       document: sanitizeProjectDocument(previous.document),
       editor: sanitizeEditorRuntime(previous.editor),
+      assetPayloads: previous.assetPayloads,
       label: previous.label,
     };
   }
@@ -119,16 +132,20 @@ export const useHistoryStore = defineStore("history", () => {
   function redo(
     _currentDocument: ProjectDocument,
     _currentEditor: EditorRuntimeState,
+    _currentAssetPayloads: Map<ID, Uint8Array>,
   ) {
     cancelPendingSnapshot();
 
     const next = redoStack.value.pop();
     if (!next) return null;
-    undoStack.value.push(createSnapshot(next.label, next.document, next.editor));
+    undoStack.value.push(
+      createSnapshot(next.label, next.document, next.editor, next.assetPayloads),
+    );
 
     return {
       document: sanitizeProjectDocument(next.document),
       editor: sanitizeEditorRuntime(next.editor),
+      assetPayloads: next.assetPayloads,
       label: next.label,
     };
   }

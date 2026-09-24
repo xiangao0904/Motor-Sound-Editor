@@ -42,11 +42,13 @@ import iconMove from "@/assets/icons/move.png";
 import iconKeyframe from "@/assets/icons/keyframe.png";
 import iconPreviewOpen from "@/assets/icons/preview-open.png";
 import iconPreviewClose from "@/assets/icons/preview-close.png";
+import iconSettings from "@/assets/icons/settings.png";
 
 const emit = defineEmits<{
   "return-home": [];
   "save-project": [];
   "export-project": [];
+  "edit-audio": [payload: { trackId: string; assetId: string }];
 }>();
 
 interface ChartConfig {
@@ -290,7 +292,12 @@ function showToast(message: string) {
 }
 
 function pushHistory(label: string) {
-  historyStore.pushSnapshot(label, projectStore.document, editorStore.runtime);
+  historyStore.pushSnapshot(
+    label,
+    projectStore.document,
+    editorStore.runtime,
+    assetPayloadStore.payloads,
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1824,6 +1831,16 @@ async function browseAudioFile() {
   }
 }
 
+function openAudioEditor() {
+  const track = activeTrack.value;
+  if (!track?.assetId) {
+    showToast(i18n.t("editor.selectAudioFirst"));
+    return;
+  }
+
+  emit("edit-audio", { trackId: track.id, assetId: track.assetId });
+}
+
 function updateSelectedPoint(axis: "speed" | "value", value: number) {
   const selected = selectedKeyframe.value;
   if (!selected) return;
@@ -2303,10 +2320,22 @@ onBeforeUnmount(() => {
           </label>
           <label>
             <span>{{ i18n.t("editor.file") }}</span>
-            <button class="file-picker" type="button" @click="browseAudioFile">
-              <span>{{ activeAssetName }}</span>
-              <img :src="iconOpenFile" alt="" aria-hidden="true" />
-            </button>
+            <div class="file-actions">
+              <button class="file-picker" type="button" @click="browseAudioFile">
+                <span>{{ activeAssetName }}</span>
+                <img :src="iconOpenFile" alt="" aria-hidden="true" />
+              </button>
+              <button
+                class="audio-edit-button"
+                type="button"
+                :disabled="!activeTrack.assetId"
+                :title="i18n.t('editor.editAudio')"
+                :aria-label="i18n.t('editor.editAudio')"
+                @click="openAudioEditor"
+              >
+                <img :src="iconSettings" alt="" aria-hidden="true" />
+              </button>
+            </div>
           </label>
 
           <div class="divider" />
@@ -2905,8 +2934,9 @@ onBeforeUnmount(() => {
 .track-row,
 .icon-toggle,
 .mini-toggle,
-.file-picker,
-.delete-button,
+  .file-picker,
+  .audio-edit-button,
+  .delete-button,
 .play-button,
 .mode-control button {
   color: inherit;
@@ -3121,7 +3151,13 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+.track-layers header h2 {
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .panel h2 {
@@ -3145,6 +3181,7 @@ onBeforeUnmount(() => {
 
 .track-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
   align-items: center;
 }
@@ -3271,6 +3308,35 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: #172129;
   border-radius: 4px;
+}
+
+.file-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 6px;
+}
+
+.audio-edit-button {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  padding: 0;
+  background: #172129;
+  border-radius: 4px;
+}
+
+.audio-edit-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.audio-edit-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.audio-edit-button img {
+  width: 18px;
+  height: 18px;
 }
 
 .file-picker span {
